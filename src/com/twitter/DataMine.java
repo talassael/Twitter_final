@@ -111,7 +111,7 @@ public class DataMine
 			Mongo mongo=new Mongo("localhost",27017);
 			final DB db = mongo.getDB("twitter");//Creating the name of the new DB
 			
-			final Processor proc = new Processor(mongo , db , slot_time_millis , frame_time , threshhold , depth);
+			final Processor proc = new Processor(mongo , db , slot_time_millis , frame_time , threshhold , depth , (long)num_of_slots);
 			/*LinkedList <String> search_terms = new LinkedList <String>();
 			search_terms.add("england");
 			search_terms.add("israel");
@@ -142,15 +142,25 @@ public class DataMine
 			});
 			//t0.setPriority(10);
 			//t0.start();
-			//t2.setPriority(Thread.MAX_PRIORITY);
+			t1.setPriority(Thread.MAX_PRIORITY);
+			
+			
 			t2.start();
 			t1.start();
 			
+			//neo4j.addNode("#asia", "@SirRocStar" , proc.log4j);
 			
-			/*LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList("@DCarsonCPA_NYC"));
+			//proc.GetRateTimeFrame(602720179L, 97L);
+			
+			
+			
+			/*LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList("@BreakingNews"));
 			searchlist = proc.get_final_tweet_ids(searchlist);
 			System.out.println("size of list: " + searchlist.size());
 			proc.TweetCompare(searchlist, 1, proc.threshold);*/
+			
+			
+			
 			//proc.TweetCompare(searchlist, 2, proc.threshold);
 
 		}//close main

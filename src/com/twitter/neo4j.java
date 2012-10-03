@@ -1,5 +1,7 @@
 package com.twitter;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
@@ -52,9 +54,10 @@ public class neo4j {
     }
     
     @SuppressWarnings("static-access")
+	static
 	void shutDown()
     {
-        this.graphDb.shutdown();
+        graphDb.shutdown();
         System.out.println("graphDB shut down.");   
     }
     
@@ -120,7 +123,7 @@ public class neo4j {
      
    
    
-   public static void addNode(String parent,String child )
+   public static void addNode(String parent,String[] childs,Logger log4j )
    {
 	 Transaction tx = graphDb.beginTx();
    	 
@@ -129,35 +132,43 @@ public class neo4j {
         
          //log4j.info("start adding nodes, parent query is: " + parent + ", son is: " + child);
        	 Node par = getOrCreateNodeWithUniqueFactory( parent, graphDb );
-       	 Node son = getOrCreateNodeWithUniqueFactory( child, graphDb );
+       	 //Node son = getOrCreateNodeWithUniqueFactory( child, graphDb );
        	 boolean relationship_exists = false;
+       	 LinkedList<String> sonstoadd = new LinkedList(Arrays.asList(childs));
+       	 sonstoadd = new LinkedList<String>(new HashSet(sonstoadd));
+       	 sonstoadd.remove(parent);
        	 //IndexManager index = graphDb.index();
        	 //RelationshipIndex pars = index.forRelationships( "org.neo4j.graphdb.Relationship" );
        	 //IndexHits<Relationship> relIndex;
-       	 Iterable<Relationship> b = par.getRelationships();
+       	 Iterable<Relationship> b = par.getRelationships(RelTypes.PARENT, Direction.OUTGOING);
        	 Iterator<Relationship> c = b.iterator();
        	 if (c.hasNext()){
        		 while (c.hasNext()){
-           		 if (c.next().getOtherNode(par) == son){
-           		 relationship_exists = true;
-               	 }
-           	 }
-       		 if (relationship_exists == false){
-           		 Relationship pnt = par.createRelationshipTo(son, RelTypes.PARENT);
-           		 pnt.setProperty("parent", 1);
-           		 //Relationship sn = son.createRelationshipTo(par, RelTypes.SON);
-           		 //sn.setProperty("parent", -1);
+       			 Node temp = c.next().getOtherNode(par);
+       			 for (int i=0;i<childs.length;i++)
+       			 {
+       				if (String.valueOf(temp.getProperty("search_term")) == String.valueOf(childs[i]))
+       				{
+       					sonstoadd.remove(childs[i]);
+       				}
+       				
+       			 }
            		 
            	 }
-       		 
        	 }
-       	 else{
-       		 Relationship pnt = par.createRelationshipTo(son, RelTypes.PARENT);
-       		 pnt.setProperty("parent", 1);
-       		 //Relationship sn = son.createRelationshipTo(par, RelTypes.SON);
-       		 //sn.setProperty("parent", -1);
+   		 Iterator<String> sons = sonstoadd.iterator();
+   		 while (sons.hasNext())
+   		 {
+   			 String son1 = sons.next();
+   			 log4j.info("inserting new relationship, parent is:  " + parent + "  and son is:  " + son1);
+   			 Node son = getOrCreateNodeWithUniqueFactory( son1, graphDb );
+   			 Relationship pnt = par.createRelationshipTo(son, RelTypes.PARENT);
+   			 pnt.setProperty("parent", 1);
+   		 }
        		 
-       	 }
+       		 
+       	 
+       	 
        	 
        	 
        	 
@@ -168,7 +179,9 @@ public class neo4j {
         }
         finally
         {
+        	//log4j.info("end add node");
             tx.finish();
+            //shutDown();
         }
    	
    }

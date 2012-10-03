@@ -106,13 +106,14 @@ public class Processor {
     public long frame_time;// total frame time
     public int threshold;// threshold for distance function
     public int depth;// depth to look in tree
+    public long num_of_slots;
     public double slot_time_millis;// time of a single time slot
     static volatile long tweet_id_index;
     //static Long MaximumInsertSize=160L;
     //public neo4j myNeoInstance = new neo4j();
 	//myNeoInstance.createDb();
 	
-	public Processor(Mongo mongo,DB db ,double slot_time_millis , long frame_time , int threshold , int depth) 
+	public Processor(Mongo mongo,DB db ,double slot_time_millis , long frame_time , int threshold , int depth , long num_of_slots) 
 	{
 		
 		
@@ -132,6 +133,7 @@ public class Processor {
 		this.threshold = threshold;
 		this.depth = depth;
 		this.frame_time = frame_time;
+		this.num_of_slots = num_of_slots;
 		this.index_all_tweets = new BasicDBObject("id" , 1);
 		this.index_search_terms = new BasicDBObject("search_term" , 1);
 		this.index_over_all = new BasicDBObject("over_all" , 1);
@@ -139,7 +141,7 @@ public class Processor {
 		this.index_user_rate = new BasicDBObject("user_id" , 1);
 		this.index_sr = new BasicDBObject("searchword" , 1);
 		this.index_tree = new BasicDBObject("parent",1);
-		this.index_tree.put("son", 1);
+		//this.index_tree.put("son", 1);
 		log4j.info("ensuring uniqe index for tweet id in all_tweets collection");
 		this.collat.ensureIndex(this.index_all_tweets , "tweet_id" , true);
 		log4j.info("ensuring uniqe index for user id in user_rate collection");
@@ -230,13 +232,12 @@ public class Processor {
 			DBCursor cursor = this.colltree.find();
 			while (cursor.count() < 1){
 				try {
-					log4j.info("there is no nodes to process at the moment, going to sleep for 1 seconds");
+					log4j.info("there is no nodes to process at the moment, going to sleep for 10 seconds");
 					//log4j.info("update_all_tweets is going to sleep fo 0.25 minute, " + countelements.toString() + " elements moved so far, no docs currently in raw data");
 					Thread.currentThread();
-					Thread.sleep(1000*1);
+					Thread.sleep(1000*10);
 					//System.out.println("update_all_tweets woke up ");
 					log4j.info("update_tree woke up, continues");
-					//this.collrd = db.getCollection(this.collrd);//the raw jsons collection inserted to twitter database
 					cursor = this.colltree.find();
 				} catch (InterruptedException e) {
 					log4j.error("InterruptedException caught, at update_all_tweets");
@@ -244,15 +245,34 @@ public class Processor {
 					log4j.error(e);
 				}
 			}
-			while (cursor.hasNext())
+			try
 			{
-				DBObject tr = cursor.next();
-				String parent = tr.get("parent").toString();
-				String son = tr.get("son").toString();
-				log4j.info("adding nodes to neo4j, parent is:  " + parent + "  ,  and son is:  " + son);
-				neo4j.addNode(parent, son);
-				this.colltree.remove(tr);
+				while (cursor.hasNext())
+				{
+					DBObject tr = cursor.next();
+					try
+					{
+						String parent = tr.get("parent").toString();
+						String[] sons = tr.get("son").toString().split(",");
+						this.colltree.remove(tr);
+						//log4j.info("adding nodes to neo4j, parent is:  " + parent + "  ,  and son is:  " + son);
+						neo4j.addNode(parent, sons , this.log4j);
+						
+					}
+					catch (Exception e)
+					{
+						//log4j.error(e);
+						System.out.println(e);
+						this.colltree.remove(tr);
+					}
+					
+				}
 			}
+			catch (MongoException e)
+			{
+				log4j.error(e);
+			}
+			
 		}
 	}
 	
@@ -461,8 +481,19 @@ public class Processor {
 					if (String.valueOf(query) != String.valueOf(thisterm)){
 						DBObject nodes = new BasicDBObject();
 						nodes.put("parent", query);
-						nodes.put("son", thisterm);
-						this.colltree.insert(nodes);
+						try
+						{
+							nodes = colltree.findOne(nodes);
+							nodes.put("son", nodes.get("son").toString() + "," + thisterm);
+						}
+						catch (NullPointerException e)
+						{
+							nodes = new BasicDBObject();
+							nodes.put("parent", query);
+							nodes.put("son", thisterm);
+						}
+						//nodes.put("son", thisterm);
+						this.colltree.save(nodes);
 						//neo4j.addNode(query, thisterm, log4j);
 					}
 					//objtoupd = collsearch.findOne(objterm); // find the search word in collection
@@ -522,7 +553,7 @@ public class Processor {
 			int previous_slot = (Integer) term.get("current_slot");
 			double delta = (System.currentTimeMillis() - (Long) term.get("current_slot_start_time_millis")) / this.slot_time_millis ;
 			if (delta < 1){
-				term.put("over_all", Integer.parseInt(term.get("over_all").toString()) + 1);
+				//term.put("over_all", Integer.parseInt(term.get("over_all").toString()) + 1);
 				term.put("slot" + current_slot_index, Integer.parseInt(term.get("slot" + this.current_slot_index).toString()) + 1);
 				log4j.info("updating counter in current slot for userid: " + user_id + " user_name : " + user_name);
 				this.collrate.update(objterm, term);
@@ -533,10 +564,10 @@ public class Processor {
 					
 					if (h == 0){
 						term.put("slot" + slot, 1);
-						term.put("over_all", Integer.parseInt(term.get("over_all").toString())  + 1 - Integer.parseInt(term.get("slot" + slot).toString()));
+						//term.put("over_all", Integer.parseInt(term.get("over_all").toString())  + 1 - Integer.parseInt(term.get("slot" + slot).toString()));
 					}
 					else{
-						term.put("over_all", Integer.parseInt(term.get("over_all").toString()) - Integer.parseInt(term.get("slot" + slot).toString()));
+						//term.put("over_all", Integer.parseInt(term.get("over_all").toString()) - Integer.parseInt(term.get("slot" + slot).toString()));
 						term.put("slot" + slot, 0);
 					}
 					
@@ -547,7 +578,7 @@ public class Processor {
 				this.collrate.update(objterm, term);
 			}
 			else{
-				term.put("over_all", 1);
+				//term.put("over_all", 1);
 				//newline.put("max_id", 0);
 				term.put("current_slot", current_slot_index);
 				term.put("current_slot_start_time_millis", current_slot_start_time);
@@ -569,7 +600,7 @@ public class Processor {
 			DBObject newline = new BasicDBObject();
 			newline.put("user_id", user_id);
 			newline.put("user_name", user_name);
-			newline.put("over_all", 1);
+			//newline.put("over_all", 1);
 			//newline.put("max_id", 0);
 			newline.put("current_slot", current_slot_index);
 			newline.put("current_slot_start_time_millis", current_slot_start_time);
@@ -687,7 +718,7 @@ public class Processor {
 						}
 					}
 				}
-				obj.put("tweets", obj.get("tweets").toString() + "," + tweet_id);
+				obj.put("tweets", new_string + "," + tweet_id);
 				this.collsr.save(obj);
 			}
 			catch (NullPointerException e){
@@ -876,6 +907,47 @@ public class Processor {
 		}
 		//---------------------------------------------------------------------------------------------------------------
 		
+		
+		public long GetRateTimeFrame(Long UserId,Long numofhours)
+		{
+			 this.log4j.info("======================================================");
+			 long diff = numofhours*60*60*1000;
+			 BasicDBObject docline = new BasicDBObject();
+			 docline.put("user_id", UserId);//querying to find the right userId
+			 DBObject doc = this.collrate.findOne(docline);
+			 if (doc == null)
+			 {
+				 this.log4j.error("user id : " + UserId + " does not exist");
+				 return -1L;
+			 }
+			 else
+			 {
+			 long result = 0;
+			 long currstart = Long.parseLong(doc.get("current_slot_start_time_millis").toString());
+			 if (System.currentTimeMillis() - diff > currstart)
+			 {
+				 this.log4j.info("result is 0");
+				 return 0;
+			 }
+			 else
+			 {
+				 double backslots = diff/this.slot_time_millis;
+				 if (backslots > this.num_of_slots)
+				 {
+					 this.log4j.info("you requested longer time than the time frame, the result will be only for the previous timeframe");
+				 }
+				 for (int i=0;i<backslots || i<this.num_of_slots;i++)
+				 {
+					 int slot = (int) ((this.current_slot_index - i + this.num_of_slots)%this.num_of_slots);
+					 result += Long.parseLong(doc.get("slot" + slot).toString());
+				 }
+				 this.log4j.info("result is " + result);
+				 return result;
+			 }
+			 }
+			 			 
+			 
+		}
 	
 
 }

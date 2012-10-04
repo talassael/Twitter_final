@@ -37,7 +37,7 @@ public class neo4j {
 	private static final String DB_PATH = "C:/workspace/Twitter_final/neo4j";
 
     static String myString;
-    static GraphDatabaseService graphDb = new GraphDatabaseFactory().newEmbeddedDatabase( DB_PATH );
+    static GraphDatabaseService graphDb;// = new GraphDatabaseFactory().newEmbeddedDatabase( DB_PATH );
    // static Node myFirstNode;
     //static Node mySecondNode;
    // static Relationship myRelationship;
@@ -48,9 +48,10 @@ public class neo4j {
     }
     
     @SuppressWarnings("static-access")
+	static
 	void createDb()
     {
-        this.graphDb = new GraphDatabaseFactory().newEmbeddedDatabase( DB_PATH );       
+        graphDb = new GraphDatabaseFactory().newEmbeddedDatabase( DB_PATH );       
     }
     
     @SuppressWarnings("static-access")
@@ -63,6 +64,7 @@ public class neo4j {
     
     public static Node getOrCreateNodeWithUniqueFactory( String search_term, GraphDatabaseService graphDb )
 	 {
+    	//createDb();
 	     UniqueFactory<Node> factory = new UniqueFactory.UniqueNodeFactory( graphDb, "search_term" )
 	     {
 	         @Override
@@ -71,7 +73,7 @@ public class neo4j {
 	             created.setProperty( "search_term", properties.get( "search_term" ) );
 	         }
 	     };
-	  
+	     
 	     return factory.getOrCreate( "search_term", search_term );
 	 }
    
@@ -125,7 +127,8 @@ public class neo4j {
    
    public static void addNode(String parent,String[] childs,Logger log4j )
    {
-	 Transaction tx = graphDb.beginTx();
+	    createDb(); 
+	    Transaction tx = graphDb.beginTx();
    	 
         try
         {
@@ -181,7 +184,7 @@ public class neo4j {
         {
         	//log4j.info("end add node");
             tx.finish();
-            //shutDown();
+            shutDown();
         }
    	
    }

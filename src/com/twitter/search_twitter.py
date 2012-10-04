@@ -77,13 +77,14 @@ def fill_queue(initial_search_terms , count , max_queue , min_terms , percents ,
             for i in range(current_percentage):
                 to_skip = to_skip + num_of_perc[i]
         limit = num_of_perc[current_percentage]
-        terms = db.search_terms.find().skip(to_skip).limit(limit)
+        terms = db.search_terms.find().sort("over_all" , -1).skip(to_skip).limit(limit)
         for term in terms:
             if (term['search_term'] == ''):
                 db.search_terms.remove(term)
             else:
-                queue.put((term['search_term'] , term['max_id'])) #    insert term to queue
-                count_inserted = count_inserted + 1
+                for i in range(limit):
+                    queue.put((term['search_term'] , term['max_id'])) #    insert term to queue
+                    count_inserted = count_inserted + 1
         logging.info(str(time.ctime()) + ' : ' + str(count_inserted) + ' search terms inserted to queue, from percentage: ' + str(current_percentage) + ' which is ' + str(percentage[current_percentage*2]) + '%.')
         #if (time.time() > sorted_percentage[0][1] + 300): #   current time is earlier then sample time
         #    logging.info(str(time.ctime()) + ' : going to sleep for - ' + str(time.time()-sorted_percentage[0][1]) + ' seconds.')

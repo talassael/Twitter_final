@@ -155,8 +155,6 @@ public class DataMine
 			
 			
 			/*LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList("@BreakingNews"));
-			searchlist = proc.get_final_tweet_ids(searchlist);
-			System.out.println("size of list: " + searchlist.size());
 			proc.TweetCompare(searchlist, 1, proc.threshold);*/
 			
 			

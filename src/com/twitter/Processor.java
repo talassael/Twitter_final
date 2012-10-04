@@ -372,7 +372,7 @@ public class Processor {
 				    			t11.start();
 				    			t12.start();
 				    			t13.start();
-				    			try {
+				    			/*try {
 				    			      log4j.info("Waiting for threads to finish.");
 				    			      t10.join();
 				    			      t11.join();
@@ -380,7 +380,7 @@ public class Processor {
 				    			      t13.join();
 				    			    } catch (InterruptedException e) {
 				    			    	log4j.error("Main thread (update_all_tweets) Interrupted");
-				    			    }
+				    			    }*/
 				    			
 				    			
 				    			
@@ -467,7 +467,7 @@ public class Processor {
 		for (int i=0;i<textarray.length;i++){ // loop over the words of the tweet
 			if (textarray[i].trim().startsWith("@") || textarray[i].trim().startsWith("#")) { 
 				String thisterm = textarray[i].trim();
-				String[] no_ddot = thisterm.split("[:,.]");
+				String[] no_ddot = thisterm.split("[:,., ]");
 				//no_ddot = no_ddot[0].split(",");
 				//no_ddot = no_ddot[0].split(".");
 				thisterm = no_ddot[0];
@@ -872,8 +872,11 @@ public class Processor {
 		//-------------------------------------------------------------------------------------------
 		public void TweetCompare(LinkedList<String> vc,int FunctionNum,int threshold)
 		{
+			
 			log4j.info("==================================================");
 			log4j.info("We useing the comparing function number-"+FunctionNum);
+			vc = get_final_tweet_ids(vc);
+			System.out.println("size of list: " + vc.size());
 			duplicateTweets[] a=compOneF(vc,threshold,FunctionNum);	
 			log4j.info("The result of this function is:");
 			for(int i=0;i<=(a.length-1);i++)

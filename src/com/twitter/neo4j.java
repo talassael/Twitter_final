@@ -59,7 +59,7 @@ public class neo4j {
 	void shutDown()
     {
         graphDb.shutdown();
-        System.out.println("graphDB shut down.");   
+        //System.out.println("graphDB shut down.");   
     }
     
     public static Node getOrCreateNodeWithUniqueFactory( String search_term, GraphDatabaseService graphDb )

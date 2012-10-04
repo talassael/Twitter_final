@@ -168,6 +168,7 @@ public class Processor {
 	//----------------------------------------------------------------------------------------
 	public LinkedList <String> get_tweets(LinkedList <String> search_terms)
 	{
+		log4j.info("starting function get_tweets");
 		LinkedList<String> result = new LinkedList <String>();
 		Iterator<String> terms = search_terms.iterator();
 		long curr_time = System.currentTimeMillis();
@@ -210,6 +211,7 @@ public class Processor {
 			
 		}
 		log4j.info("over_all there are " + count_all + " tweets to compare!!!");
+		log4j.info("ending function get_tweets");
 		return result;
 	}
 	
@@ -322,68 +324,76 @@ public class Processor {
 				    		@SuppressWarnings("rawtypes")
 							Iterator iterArray = array.iterator();
 				    		log4j.info("iterating over array tweets");
-				    		while (iterArray.hasNext()){
-				    			Object current = iterArray.next();
-				    			final DBObject dbObject = (DBObject)JSON.parse(current.toString());
-				    			countelements++;
-				    			//System.out.println("element number" + countelements.toString());
-				    			dbObject.put("max_id", currdoc.get("max_id"));
-				    			dbObject.put("query", currdoc.get("query"));
-				    			dbObject.put("query_time", currdoc.get("query_time"));
-				    			dbObject.put("query_time_string", currdoc.get("query_time_string"));
-				    			dbObject.put("text", "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString());
-				    			log4j.info("inserting tweet id: " + dbObject.get("id").toString());
-				    			collat.insert(dbObject);
-				    			//collrd.findAndRemove(currdoc);
-				    			log4j.info("calling function update_search_terms");
-				    			//final String text = "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString();
-				    			
-				    			
-				    			Thread t10=new Thread(new Runnable(){
-				    				public void run(){
-				    					UpdateTweetCounterId(Long.parseLong(dbObject.get("id").toString()));
-				    				}
-				    			});
-				    			
-				    			Thread t11=new Thread(new Runnable(){
-				    				public void run(){
-				    					update_search_terms(dbObject.get("text").toString()  , num_of_slots , max_time_frame_hours , dbObject.get("query").toString());
-				    				}
-				    			});
-				    			
-				    			Thread t12=new Thread(new Runnable(){
-				    				public void run(){
-				    					rate_user(Long.parseLong(dbObject.get("from_user_id").toString()) , dbObject.get("from_user").toString() , num_of_slots , max_time_frame_hours);
-				    					//UpdateUserRate((long)num_of_slots,slot_time_millis,Long.parseLong(dbObject.get("from_user_id").toString()) , dbObject.get("from_user").toString() ,(long)0);
-				    				}
-				    			});
-				    			
-				    			Thread t13=new Thread(new Runnable(){
-				    				public void run(){
-				    					String quer = dbObject.get("query").toString();
-				    					quer = quer.replaceAll("%40", "@");
-				    					quer = quer.replaceAll("%23", "#");
-				    					long id = (long) (Double.parseDouble(dbObject.get("query_time").toString()) * 1000);
-				    					String idplus = dbObject.get("id").toString() + "," + id;
-				    					SearchResultId(quer , idplus );
-				    				}
-				    			});
-				    			t10.start();
-				    			t11.start();
-				    			t12.start();
-				    			t13.start();
-				    			/*try {
-				    			      log4j.info("Waiting for threads to finish.");
-				    			      t10.join();
-				    			      t11.join();
-				    			      t12.join();
-				    			      t13.join();
-				    			    } catch (InterruptedException e) {
-				    			    	log4j.error("Main thread (update_all_tweets) Interrupted");
-				    			    }*/
-				    			
-				    			
-				    			
+				    		try
+				    		{
+				    			while (iterArray.hasNext()){
+					    			Object current = iterArray.next();
+					    			final DBObject dbObject = (DBObject)JSON.parse(current.toString());
+					    			countelements++;
+					    			//System.out.println("element number" + countelements.toString());
+					    			dbObject.put("max_id", currdoc.get("max_id"));
+					    			dbObject.put("query", currdoc.get("query"));
+					    			dbObject.put("query_time", currdoc.get("query_time"));
+					    			dbObject.put("query_time_string", currdoc.get("query_time_string"));
+					    			dbObject.put("text", "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString());
+					    			log4j.info("inserting tweet id: " + dbObject.get("id").toString());
+					    			collat.insert(dbObject);
+					    			//collrd.findAndRemove(currdoc);
+					    			//log4j.info("calling function update_search_terms");
+					    			//final String text = "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString();
+					    			
+					    			
+					    			Thread t10=new Thread(new Runnable(){
+					    				public void run(){
+					    					UpdateTweetCounterId(Long.parseLong(dbObject.get("id").toString()));
+					    				}
+					    			});
+					    			
+					    			Thread t11=new Thread(new Runnable(){
+					    				public void run(){
+					    					update_search_terms(dbObject.get("text").toString()  , num_of_slots , max_time_frame_hours , dbObject.get("query").toString());
+					    				}
+					    			});
+					    			
+					    			Thread t12=new Thread(new Runnable(){
+					    				public void run(){
+					    					rate_user(Long.parseLong(dbObject.get("from_user_id").toString()) , dbObject.get("from_user").toString() , max_time_frame_hours);
+					    					//UpdateUserRate((long)num_of_slots,slot_time_millis,Long.parseLong(dbObject.get("from_user_id").toString()) , dbObject.get("from_user").toString() ,(long)0);
+					    				}
+					    			});
+					    			
+					    			Thread t13=new Thread(new Runnable(){
+					    				public void run(){
+					    					String quer = dbObject.get("query").toString();
+					    					quer = quer.replaceAll("%40", "@");
+					    					quer = quer.replaceAll("%23", "#");
+					    					long id = (long) (Double.parseDouble(dbObject.get("query_time").toString()) * 1000);
+					    					String idplus = dbObject.get("id").toString() + "," + id;
+					    					SearchResultId(quer , idplus );
+					    				}
+					    			});
+					    			t10.start();
+					    			t11.start();
+					    			t12.start();
+					    			t13.start();
+					    			try {
+					    			      log4j.info("Waiting for threads to finish.");
+					    			      t10.join();
+					    			      t11.join();
+					    			      t12.join();
+					    			      t13.join();
+					    			    } catch (InterruptedException e) {
+					    			    	log4j.error("Main thread (update_all_tweets) Interrupted");
+					    			    }
+					    			
+					    			
+					    			
+					    		}
+				    		}
+				    		catch (Exception e)
+				    		{
+				    			log4j.error(e);
+				    			e.printStackTrace();
 				    		}
 				    	
 				    			
@@ -414,7 +424,8 @@ public class Processor {
 	//----------------------------------------------------------------------------------------
 	@SuppressWarnings("deprecation")
 	public void update_search_terms(String text , double num_of_slots , double max_time_frame_hours , String query) throws MongoException{
-		log4j.info("starting function update_search_terms");
+		log4j.info("starting function update_search_terms, num_of_slots = " + num_of_slots + ", max_time_frame_hours = " + max_time_frame_hours
+				 + ", query = " + query);
 		String[] textarray = text.split(" "); // split tweet text into a words array
 		log4j.info("split tweet text into a word array");
 		BasicDBObject objterm = new BasicDBObject();
@@ -467,7 +478,7 @@ public class Processor {
 		for (int i=0;i<textarray.length;i++){ // loop over the words of the tweet
 			if (textarray[i].trim().startsWith("@") || textarray[i].trim().startsWith("#")) { 
 				String thisterm = textarray[i].trim();
-				String[] no_ddot = thisterm.split("[:,., ]");
+				String[] no_ddot = thisterm.split("[:,., ,;,\n]");
 				//no_ddot = no_ddot[0].split(",");
 				//no_ddot = no_ddot[0].split(".");
 				thisterm = no_ddot[0];
@@ -537,13 +548,14 @@ public class Processor {
 	
 	//----This function getting user id and inserts/updates counter with time slots handling----
 	//----------------------------------------------------------------------------------------
-	public void rate_user(long user_id , String user_name , double num_of_slots , double max_time_frame_hours) throws MongoException{
+	public void rate_user(long user_id , String user_name , double max_time_frame_hours) throws MongoException{
 		//log4j.info("starting function rate");
 		//BasicDBObject objind = new BasicDBObject();
 		BasicDBObject objterm = new BasicDBObject();
 		DBObject objtoupd = new BasicDBObject();
 		DBObject update = new BasicDBObject();
-		log4j.info("starting function rate user");
+		log4j.info("starting function rate user for : user_name = " + user_name + ", user_id = " + user_id +
+				", max_time_frame_hours = " + max_time_frame_hours);
 		//objind.put("user_id", 1); // an object to ensure a unique index of search term
 		//log4j.info("ensuring unique index user_id in user_rate collection");
 		//this.collrate.ensureIndex(objind, "user_id", true); // ensure a unique index of search term
@@ -558,7 +570,7 @@ public class Processor {
 				log4j.info("updating counter in current slot for userid: " + user_id + " user_name : " + user_name);
 				this.collrate.update(objterm, term);
 			}
-			else if(delta < num_of_slots){
+			else if(delta < this.num_of_slots){
 				for (long h = 0;h<delta;h++){
 					long slot = (long) ((long) (this.current_slot_index + num_of_slots - h)% num_of_slots);
 					
@@ -696,7 +708,8 @@ public class Processor {
 	//----This function getting search term and tweet id ----
 	//----the function adding the tweet id and the time of search to the collection search_results--
 		public void SearchResultId(String searchword,String tweet_id)
-		{	
+		{
+			log4j.info("starting function SearchResultId with parameters: searchword = " + searchword + ", tweet_id" + tweet_id);
 			try{
 				DBObject searchobj = new BasicDBObject();
 				searchobj.put("searchword", searchword);
@@ -727,6 +740,7 @@ public class Processor {
 				searchobj.put("tweets", tweet_id);
 				this.collsr.save(searchobj);
 			}
+			log4j.info("ending function SearchResultId");
 			
 		}
 	 

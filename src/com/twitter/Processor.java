@@ -881,8 +881,16 @@ public class Processor {
 			vc = get_final_tweet_ids(vc);
 			System.out.println("size of list: " + vc.size());
 			duplicateTweets[] a=compOneF(vc,threshold,FunctionNum);	
-			log4j.info("The result of this function is:");
-			for(int i=0;i<=(a.length-1);i++)
+			if (a.length > 0)
+			{
+				log4j.info("The result of this function is:");
+			}
+			else
+			{
+				log4j.info("there are no tweets to compare!!!");
+				return;
+			}
+			for(int i=0;i<(a.length);i++)
 			{
 				if(a[i]!=null)
 				{

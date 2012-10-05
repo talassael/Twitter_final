@@ -102,6 +102,7 @@ public class neo4j {
     //The function gets a list of words and returns a list of words from all those words paths within given depth
     public static LinkedList <String> getallsearchterms( LinkedList <String> search_terms , int depth, Logger log4j)
     {
+    	createDb();
     	log4j.info("starting method : getallsearchterms");
     	Iterator<String> iter = search_terms.iterator();
     	LinkedList <String> result = new LinkedList <String>();
@@ -121,6 +122,7 @@ public class neo4j {
     		}
     	}
     	log4j.info("end method : getallsearchterms");
+    	shutDown();
     	return result;
     }
      

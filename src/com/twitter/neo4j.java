@@ -77,7 +77,7 @@ public class neo4j {
 	     return factory.getOrCreate( "search_term", search_term );
 	 }
    
-    private static LinkedList <String> getpath( final Node Base , final int depth, Logger log4j)
+    static LinkedList <String> getpath( final Node Base , final int depth, Logger log4j)
     {
     	log4j.info("starting method : getpath");
  	   final StopEvaluator DEPTH_limited = new StopEvaluator()
@@ -114,10 +114,17 @@ public class neo4j {
     	result.addAll(search_terms);
     	while (iter.hasNext())
     	{
-    		//int countfornode = 0;
-    		Node node = getOrCreateNodeWithUniqueFactory( iter.next(), graphDb );
-    		LinkedList <String> templist = getpath(node , depth , log4j);
-    		result.addAll(templist);
+    		String temp = iter.next();
+    		try
+    		{
+    			Node node = getOrCreateNodeWithUniqueFactory( temp, graphDb );
+        		LinkedList <String> templist = getpath(node , depth , log4j);
+        		result.addAll(templist);
+    		}
+    		catch (NullPointerException e)
+    		{
+    			log4j.info(temp + " is not in DB");
+    		}
     	}
     	log4j.info("end method : getallsearchterms");
     	return result;
@@ -139,6 +146,7 @@ public class neo4j {
        	 boolean relationship_exists = false;
        	 LinkedList<String> sonstoadd = new LinkedList(Arrays.asList(childs));
        	 sonstoadd = new LinkedList<String>(new HashSet(sonstoadd));
+       	 LinkedList<Node> sonsnodes = new LinkedList<Node>();
        	 sonstoadd.remove(parent);
        	 //IndexManager index = graphDb.index();
        	 //RelationshipIndex pars = index.forRelationships( "org.neo4j.graphdb.Relationship" );
@@ -150,22 +158,25 @@ public class neo4j {
        			 Node temp = c.next().getOtherNode(par);
        			 for (int i=0;i<childs.length;i++)
        			 {
-       				if (String.valueOf(temp.getProperty("search_term")) == String.valueOf(childs[i]))
+       				Node son = getOrCreateNodeWithUniqueFactory( childs[i], graphDb );
+       				sonsnodes.add(son);
+       				if (temp.getProperty("search_term") == son.getProperty("search_term"))
        				{
        					sonstoadd.remove(childs[i]);
+       					sonsnodes.remove(son);
        				}
        				
        			 }
            		 
            	 }
        	 }
-   		 Iterator<String> sons = sonstoadd.iterator();
+   		 Iterator<Node> sons = sonsnodes.iterator();
    		 while (sons.hasNext())
    		 {
-   			 String son1 = sons.next();
+   			 Node son1 = sons.next();
    			 log4j.info("inserting new relationship, parent is:  " + parent + "  and son is:  " + son1);
-   			 Node son = getOrCreateNodeWithUniqueFactory( son1, graphDb );
-   			 Relationship pnt = par.createRelationshipTo(son, RelTypes.PARENT);
+   			 //Node son = getOrCreateNodeWithUniqueFactory( son1, graphDb );
+   			 Relationship pnt = par.createRelationshipTo(son1, RelTypes.PARENT);
    			 pnt.setProperty("parent", 1);
    		 }
        		 

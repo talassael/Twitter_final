@@ -154,7 +154,7 @@ public class DataMine
 			
 			
 			
-			/*LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList("@BreakingNews"));
+			/*LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList("#kenya","#usa","tttal"));
 			proc.TweetCompare(searchlist, 1, proc.threshold);*/
 			
 			

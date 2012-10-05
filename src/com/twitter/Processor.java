@@ -424,6 +424,7 @@ public class Processor {
 	//----------------------------------------------------------------------------------------
 	@SuppressWarnings("deprecation")
 	public void update_search_terms(String text , double num_of_slots , double max_time_frame_hours , String query) throws MongoException{
+		long starttime = System.currentTimeMillis();
 		log4j.info("starting function update_search_terms, num_of_slots = " + num_of_slots + ", max_time_frame_hours = " + max_time_frame_hours
 				 + ", query = " + query);
 		String[] textarray = text.split(" "); // split tweet text into a words array
@@ -542,7 +543,8 @@ public class Processor {
 				}
 				}
 			}
-		log4j.info("end update_search_terms");
+		starttime = System.currentTimeMillis() - starttime; 
+		log4j.info("end update_search_terms, function took " + starttime + " millis");
 		
 	}
 	

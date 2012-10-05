@@ -26,22 +26,13 @@ import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 //import org.neo4j.graphdb.index.RelationshipIndex;
 import org.neo4j.graphdb.index.UniqueFactory;
 
-//import com.neo.HelloNeo4J.RelTypes;
-
-//import com.twitter.HelloNeo4J.RelTypes;
-
-//import com.twitter.neo4j.RelTypes;
-
 @SuppressWarnings("deprecation")
 public class neo4j {
 	private static final String DB_PATH = "C:/workspace/Twitter_final/neo4j";
 
-    static String myString;
+    //static String myString;
     static GraphDatabaseService graphDb;// = new GraphDatabaseFactory().newEmbeddedDatabase( DB_PATH );
-   // static Node myFirstNode;
-    //static Node mySecondNode;
-   // static Relationship myRelationship;
-
+   
     private static enum RelTypes implements RelationshipType
     {
         PARENT,SON
@@ -62,10 +53,10 @@ public class neo4j {
         //System.out.println("graphDB shut down.");   
     }
     
+    //The function gets node from string if exists or creates it if not exists
     public static Node getOrCreateNodeWithUniqueFactory( String search_term, GraphDatabaseService graphDb )
 	 {
-    	//createDb();
-	     UniqueFactory<Node> factory = new UniqueFactory.UniqueNodeFactory( graphDb, "search_term" )
+    	 UniqueFactory<Node> factory = new UniqueFactory.UniqueNodeFactory( graphDb, "search_term" )
 	     {
 	         @Override
 	         protected void initialize( Node created, Map<String, Object> properties )
@@ -73,10 +64,12 @@ public class neo4j {
 	             created.setProperty( "search_term", properties.get( "search_term" ) );
 	         }
 	     };
-	     
+
 	     return factory.getOrCreate( "search_term", search_term );
 	 }
-   
+    
+    
+    //The function gets the path(both ways) of a node within given depth
     static LinkedList <String> getpath( final Node Base , final int depth, Logger log4j)
     {
     	log4j.info("starting method : getpath");
@@ -106,6 +99,7 @@ public class neo4j {
     	
     }
     
+    //The function gets a list of words and returns a list of words from all those words paths within given depth
     public static LinkedList <String> getallsearchterms( LinkedList <String> search_terms , int depth, Logger log4j)
     {
     	log4j.info("starting method : getallsearchterms");
@@ -131,52 +125,58 @@ public class neo4j {
     }
      
    
-   
+   //The function gets parent and a list of sons
+   // the function creates nodes if not exists and creates relationship if not exists
    public static void addNode(String parent,String[] childs,Logger log4j )
    {
+	    log4j.info("start addNode with parent: " + parent);
 	    createDb(); 
 	    Transaction tx = graphDb.beginTx();
    	 
         try
         {
         
-         //log4j.info("start adding nodes, parent query is: " + parent + ", son is: " + child);
-       	 Node par = getOrCreateNodeWithUniqueFactory( parent, graphDb );
-       	 //Node son = getOrCreateNodeWithUniqueFactory( child, graphDb );
-       	 boolean relationship_exists = false;
-       	 LinkedList<String> sonstoadd = new LinkedList(Arrays.asList(childs));
-       	 sonstoadd = new LinkedList<String>(new HashSet(sonstoadd));
-       	 LinkedList<Node> sonsnodes = new LinkedList<Node>();
+         Node par = getOrCreateNodeWithUniqueFactory( parent, graphDb );
+       	 LinkedList<String> sonstoadd = new LinkedList<String>(Arrays.asList(childs));
+       	 sonstoadd = new LinkedList<String>(new HashSet<String>(sonstoadd));
        	 sonstoadd.remove(parent);
-       	 //IndexManager index = graphDb.index();
-       	 //RelationshipIndex pars = index.forRelationships( "org.neo4j.graphdb.Relationship" );
-       	 //IndexHits<Relationship> relIndex;
        	 Iterable<Relationship> b = par.getRelationships(RelTypes.PARENT, Direction.OUTGOING);
        	 Iterator<Relationship> c = b.iterator();
+       	 LinkedList<String> tri = new LinkedList<String>();
        	 if (c.hasNext()){
-       		 while (c.hasNext()){
+       		 while (c.hasNext()){ 
        			 Node temp = c.next().getOtherNode(par);
-       			 for (int i=0;i<childs.length;i++)
+       			 Iterator<String> iter = sonstoadd.iterator();
+       			 while (iter.hasNext())
        			 {
-       				Node son = getOrCreateNodeWithUniqueFactory( childs[i], graphDb );
-       				sonsnodes.add(son);
-       				if (temp.getProperty("search_term") == son.getProperty("search_term"))
+       				String next = iter.next();
+       				String tempstring = String.valueOf(temp.getProperty("search_term").toString());
+       				if (tempstring.equals(next))
        				{
-       					sonstoadd.remove(childs[i]);
-       					sonsnodes.remove(son);
+       					if (sonstoadd.contains(next))
+       					{
+       						tri.add(next);
+       					}
        				}
-       				
        			 }
+       			
+       				
+       		 }
            		 
-           	 }
+           	 
        	 }
-   		 Iterator<Node> sons = sonsnodes.iterator();
+       	 Iterator<String> ir = tri.iterator();
+       	 while (ir.hasNext())
+       	 {
+       		 sonstoadd.remove(ir.next());
+       	 }
+       	 Iterator<String> sons = sonstoadd.iterator();
    		 while (sons.hasNext())
    		 {
-   			 Node son1 = sons.next();
+   			 String son1 = sons.next();
    			 log4j.info("inserting new relationship, parent is:  " + parent + "  and son is:  " + son1);
-   			 //Node son = getOrCreateNodeWithUniqueFactory( son1, graphDb );
-   			 Relationship pnt = par.createRelationshipTo(son1, RelTypes.PARENT);
+   			 Node son = getOrCreateNodeWithUniqueFactory( son1, graphDb );
+   			 Relationship pnt = par.createRelationshipTo(son, RelTypes.PARENT);
    			 pnt.setProperty("parent", 1);
    		 }
        		 
@@ -193,9 +193,9 @@ public class neo4j {
         }
         finally
         {
-        	//log4j.info("end add node");
             tx.finish();
             shutDown();
+            log4j.info("end addNode");
         }
    	
    }

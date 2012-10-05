@@ -147,8 +147,8 @@ public class DataMine
 			
 			t2.start();
 			t1.start();
-			
-			//neo4j.addNode("#asia", "@SirRocStar" , proc.log4j);
+			//String[] a = {"#global"};
+			//neo4j.addNode("@nathanhowell", a , proc.log4j);
 			
 			//proc.GetRateTimeFrame(602720179L, 97L);
 			

@@ -10,6 +10,7 @@ import java.nio.charset.CharsetEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -85,7 +86,7 @@ public class Processor {
 	
 	volatile DBCollection collat;//all_tweets
 	volatile DBCollection collrd;//raw_data
-	volatile DBCollection collta;//tweet_appearence
+	//volatile DBCollection collta;//tweet_appearence
 	volatile DBCollection collslot;//current_slot
 	volatile DBCollection collsearch;//search_terms
 	volatile DBCollection colltree;//tree_nodes
@@ -94,8 +95,8 @@ public class Processor {
 	volatile BasicDBObject index_tweet_appearence;
 	volatile BasicDBObject index_all_tweets;
 	volatile BasicDBObject index_over_all;
-	volatile DBCollection collrate;
-	volatile DBCollection collsr;
+	volatile DBCollection collrate;//user_rate
+	volatile DBCollection collsr;//search_results
 	volatile BasicDBObject index_sr;
 	volatile BasicDBObject index_tree;
 	static volatile int[][] multD =null;
@@ -106,9 +107,9 @@ public class Processor {
     public long frame_time;// total frame time
     public int threshold;// threshold for distance function
     public int depth;// depth to look in tree
-    public long num_of_slots;
+    public long num_of_slots;//number of slots
     public double slot_time_millis;// time of a single time slot
-    static volatile long tweet_id_index;
+    //static volatile long tweet_id_index;
     //static Long MaximumInsertSize=160L;
     //public neo4j myNeoInstance = new neo4j();
 	//myNeoInstance.createDb();
@@ -125,7 +126,7 @@ public class Processor {
 		this.collsearch=db.getCollection("search_terms");
 		this.current_slot_index = 0;
 		this.current_slot_start_time = 0;
-		this.collta=db.getCollection("tweet_appearance");
+		//this.collta=db.getCollection("tweet_appearance");
 		this.collrate=db.getCollection("user_rate");
 		this.colltree = db.getCollection("tree_nodes");
 		this.collsr = db.getCollection("search_results");
@@ -151,7 +152,7 @@ public class Processor {
 		log4j.info("ensuring non uniqe index for over_all in search terms collection");
 		this.collsearch.ensureIndex(this.index_over_all, "over_all", false);
 		log4j.info("ensuring non uniqe index for id in tweet_appearence collection");
-		this.collta.ensureIndex(this.index_tweet_appearence, "tweet_id", true);
+		//this.collta.ensureIndex(this.index_tweet_appearence, "tweet_id", true);
 		log4j.info("ensuring uniqe index for searchword in search_results collection");
 		this.collsr.ensureIndex(this.index_sr , "searchword" , true);
 		//this.tweet_id_index = 0;
@@ -172,8 +173,8 @@ public class Processor {
 		LinkedList<String> result = new LinkedList <String>();
 		Iterator<String> terms = search_terms.iterator();
 		long curr_time = System.currentTimeMillis();
-		long min_time = curr_time - this.frame_time;
-		int count_all = 0;
+		long min_time = curr_time - this.frame_time;// time below min_time will be ignored
+		int count_all = 0;// tweets counter
 		while (terms.hasNext())
 		{
 			int count = 0;
@@ -181,29 +182,31 @@ public class Processor {
 			DBObject st = new BasicDBObject();
 			try{
 				st.put("searchword", term); 
-				DBObject obj = this.collsr.findOne(st);
-				String[] tweets_plus_time = obj.get("tweets").toString().split(",");
-				String new_string = "";
-				for (int i=0;i<tweets_plus_time.length-1;i+=2)
+				DBObject obj = this.collsr.findOne(st);// look for the relevant document
+				String[] tweets_plus_time = obj.get("tweets").toString().split(",");// make an array, even indexes are tweet_id's and odd indexes are their time
+				String new_string = ""; // the string to replace eventually the current field 'tweets' in the document
+				for (int i=0;i<tweets_plus_time.length-1;i+=2) // go over the tweet ids from the document
 				{
-					if (Long.parseLong(tweets_plus_time[i+1]) >= min_time)
+					if (Long.parseLong(tweets_plus_time[i+1]) >= min_time)// tweet time is within the time frame
 					{
-						result.add(tweets_plus_time[i]);
+						result.add(tweets_plus_time[i]); // add tweet id to result
 						count++;
-						if (new_string == "")
+						if (new_string == "")// add tweet information without leading comma
 						{
 							new_string += tweets_plus_time[i] + "," + tweets_plus_time[i+1];
 							//count++;
 						}
-						else
+						else // add tweet information with leading comma
 						{
 							new_string += "," + tweets_plus_time[i] + "," + tweets_plus_time[i+1];
 						}
 					}
 				}
-				count_all += count;
+				count_all += count; 
 				log4j.info(count + " tweets for term: " + term);
-				obj.put("tweets", new_string);
+				obj.put("tweets", new_string); // replace 'tweets' field
+				obj.put("last_update", System.currentTimeMillis()); // update time of update
+				collsr.save(obj);
 			}
 			catch (NullPointerException e){
 				log4j.info("search_term: " + term + ", is not in collection search_results");
@@ -219,8 +222,8 @@ public class Processor {
 	//---------the function returns a list of tweet_ids-----------
 	//----------------------------------------------------------------------------------------
 	public LinkedList<String> get_final_tweet_ids(LinkedList <String> a){
-		a = neo4j.getallsearchterms(a, depth, log4j);
-		LinkedList<String> b = this.get_tweets(a);
+		a = neo4j.getallsearchterms(a, depth, log4j); // traverse tree and get terms
+		LinkedList<String> b = this.get_tweets(a); // get tweet ids
 		return b;
 	}
 	
@@ -231,49 +234,50 @@ public class Processor {
 	{
 		while (true)
 		{
-			DBCursor cursor = this.colltree.find();
-			while (cursor.count() < 1){
+			DBObject obj = new BasicDBObject();
+			obj.put("in_process", 0); // when other thread processing, 'in_process'=1
+			DBCursor cursor = this.colltree.find(obj); // find only documents not in use of other thread
+			//log4j.info(cursor.count() + " documents to process in collection tree nodes");
+			if (!cursor.hasNext()){ // no documents to process
 				try {
 					log4j.info("there is no nodes to process at the moment, going to sleep for 10 seconds");
-					//log4j.info("update_all_tweets is going to sleep fo 0.25 minute, " + countelements.toString() + " elements moved so far, no docs currently in raw data");
 					Thread.currentThread();
-					Thread.sleep(1000*10);
-					//System.out.println("update_all_tweets woke up ");
+					Thread.sleep(1000*10); 
 					log4j.info("update_tree woke up, continues");
-					cursor = this.colltree.find();
 				} catch (InterruptedException e) {
 					log4j.error("InterruptedException caught, at update_all_tweets");
 					e.printStackTrace();
 					log4j.error(e);
 				}
 			}
-			try
+			else // there are documents to process
 			{
-				while (cursor.hasNext())
+				try
 				{
-					DBObject tr = cursor.next();
-					try
+					while (cursor.hasNext())
 					{
-						String parent = tr.get("parent").toString();
-						String[] sons = tr.get("son").toString().split(",");
-						this.colltree.remove(tr);
-						//log4j.info("adding nodes to neo4j, parent is:  " + parent + "  ,  and son is:  " + son);
-						neo4j.addNode(parent, sons , this.log4j);
+						DBObject tr = cursor.next();
+						try
+						{
+							String parent = tr.get("parent").toString();
+							String[] sons = tr.get("son").toString().split(","); // make array of sons 
+							neo4j.addNode(parent, sons , this.log4j); // create nodes and relationships if not exists
+							this.colltree.remove(tr); // remove document from collection
+							
+						}
+						catch (ConcurrentModificationException e)
+						{
+							//log4j.error(e);
+							log4j.warn(e);
+						}
 						
 					}
-					catch (Exception e)
-					{
-						//log4j.error(e);
-						System.out.println(e);
-						this.colltree.remove(tr);
-					}
-					
 				}
-			}
-			catch (MongoException e)
-			{
-				log4j.error(e);
-			}
+				catch (MongoException e)
+				{
+					log4j.error(e);
+				}
+				}
 			
 		}
 	}
@@ -289,26 +293,26 @@ public class Processor {
 		Integer countelements = 0;
 		while(true)
 		{
-			DBCursor cursor = this.collrd.find();
-			while (this.collrd.count() < 1){
+			//DBCursor cursor = this.collrd.find();
+			while (this.collrd.count() < 1){ //no documents to process
 				try {
-					log4j.info("there is no raw data at the moment, going to sleep for 1 seconds");
+					log4j.info("there is no raw data at the moment, going to sleep for 10 seconds");
 					Thread.currentThread();
-					Thread.sleep(1000*1);
+					Thread.sleep(1000*10);
 					log4j.info("woke up, continues");
-					cursor = this.collrd.find();
+					//cursor = this.collrd.find();
 				} catch (InterruptedException e) {
 					log4j.error("InterruptedException caught, at update_all_tweets");
 					log4j.error(e);
 				}
 			}
-			cursor = this.collrd.find();
+			DBCursor cursor = this.collrd.find();//get all documents from raw_data collection
 			try{
 			    while (cursor.hasNext())
 			    {
 			    	DBObject currdoc = cursor.next();
 			    	log4j.info("getting a document from the raw data db");
-			    	Object results=currdoc.get("results");
+			    	Object results=currdoc.get("results"); // result - json array of tweets
 			    	try{
 			    		res = results.toString();
 			    	}
@@ -317,10 +321,10 @@ public class Processor {
 			    	}
 			    	Object obj=JSONValue.parse(res);
 			    	log4j.info("making an array from the jsons tweets");
-			    	JSONArray array=(JSONArray)obj;
+			    	JSONArray array=(JSONArray)obj; // make an array of tweets
 			    	//JSONParser parser = new JSONParser();
 			    	try{
-			    		if (res != ""){
+			    		if (res != ""){ // if there are tweets
 				    		@SuppressWarnings("rawtypes")
 							Iterator iterArray = array.iterator();
 				    		log4j.info("iterating over array tweets");
@@ -328,26 +332,42 @@ public class Processor {
 				    		{
 				    			while (iterArray.hasNext()){
 					    			Object current = iterArray.next();
-					    			final DBObject dbObject = (DBObject)JSON.parse(current.toString());
+					    			final DBObject dbObject = (DBObject)JSON.parse(current.toString()); // parse all tweet data to json
 					    			countelements++;
 					    			//System.out.println("element number" + countelements.toString());
-					    			dbObject.put("max_id", currdoc.get("max_id"));
-					    			dbObject.put("query", currdoc.get("query"));
-					    			dbObject.put("query_time", currdoc.get("query_time"));
-					    			dbObject.put("query_time_string", currdoc.get("query_time_string"));
-					    			dbObject.put("text", "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString());
+					    			dbObject.put("max_id", currdoc.get("max_id")); // add max_id to tweet data
+					    			dbObject.put("query", currdoc.get("query")); // add query word to tweet data
+					    			dbObject.put("query_time", currdoc.get("query_time")); // add query time to tweet data
+					    			dbObject.put("query_time_string", currdoc.get("query_time_string")); 
+					    			dbObject.put("text", "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString()); // add user_name to beginning of text
+					    			dbObject.put("count", 1L); // add appearance counter to tweet data
 					    			log4j.info("inserting tweet id: " + dbObject.get("id").toString());
+					    			try
+					    			{
+					    				DBObject object = new BasicDBObject();
+					    				object.put("id", Long.parseLong(dbObject.get("id").toString())); // object to search
+					    				DBObject newobject = collat.findOne(object);
+					    				if (newobject != null)
+					    				{
+					    					newobject.put("count", Long.parseLong(newobject.get("count").toString()) + 1); // update counter if id already exists
+					    					collat.update(object, newobject);
+					    				}
+					    			}
+					    			catch (NullPointerException e)
+					    			{
+					    				
+					    			}
 					    			collat.insert(dbObject);
 					    			//collrd.findAndRemove(currdoc);
 					    			//log4j.info("calling function update_search_terms");
 					    			//final String text = "@" + dbObject.get("from_user").toString() + ": " + dbObject.get("text").toString();
 					    			
 					    			
-					    			Thread t10=new Thread(new Runnable(){
+					    			/*Thread t10=new Thread(new Runnable(){
 					    				public void run(){
 					    					UpdateTweetCounterId(Long.parseLong(dbObject.get("id").toString()));
 					    				}
-					    			});
+					    			});*/
 					    			
 					    			Thread t11=new Thread(new Runnable(){
 					    				public void run(){
@@ -372,13 +392,13 @@ public class Processor {
 					    					SearchResultId(quer , idplus );
 					    				}
 					    			});
-					    			t10.start();
+					    			//t10.start();
 					    			t11.start();
 					    			t12.start();
 					    			t13.start();
 					    			try {
 					    			      log4j.info("Waiting for threads to finish.");
-					    			      t10.join();
+					    			      //t10.join();
 					    			      t11.join();
 					    			      t12.join();
 					    			      t13.join();
@@ -424,7 +444,7 @@ public class Processor {
 	//----------------------------------------------------------------------------------------
 	@SuppressWarnings("deprecation")
 	public void update_search_terms(String text , double num_of_slots , double max_time_frame_hours , String query) throws MongoException{
-		long starttime = System.currentTimeMillis();
+		//long starttime = System.currentTimeMillis();
 		log4j.info("starting function update_search_terms, num_of_slots = " + num_of_slots + ", max_time_frame_hours = " + max_time_frame_hours
 				 + ", query = " + query);
 		String[] textarray = text.split(" "); // split tweet text into a words array
@@ -435,7 +455,7 @@ public class Processor {
 		DBObject curr_slot = new BasicDBObject();
 		
 		log4j.info("starting function update_search_terms");
-		curr_slot = this.collslot.findOne();
+		curr_slot = this.collslot.findOne(); // get current time slot information
 		this.current_slot_start_time = (long)(Double.parseDouble((curr_slot.get("slot_start_time").toString())));
 		Date resultdate = new Date(this.current_slot_start_time);
 		log4j.info("current_slot_start_time is : " + resultdate.toLocaleString());
@@ -443,8 +463,9 @@ public class Processor {
 		log4j.info("current time slot is  : " + this.current_slot_index);
 		long difference = System.currentTimeMillis() - this.current_slot_start_time;
 		
-		if (difference > this.slot_time_millis){
-			this.current_slot_start_time += (long)this.slot_time_millis;
+		if (difference > this.slot_time_millis){ // starting a new time slot
+			// update current slot information
+			this.current_slot_start_time += (long)this.slot_time_millis; 
 			this.current_slot_index = (int) ((this.current_slot_index+1) % num_of_slots);
 			log4j.info("new slot time has come, new slot is slot number " +  this.current_slot_index);
 			curr_slot.put("current_slot", this.current_slot_index);
@@ -453,10 +474,10 @@ public class Processor {
 			log4j.info("updating new current slot time and number in db");
 			this.collslot.save(curr_slot);
 			
-			DBCursor terms = this.collsearch.find();
-			log4j.info("1");
+			DBCursor terms = this.collsearch.find(); // get all search_terms documents to update new slot to zero
 			while (terms.hasNext()){
 				try{
+					// update new slot to zero and reducing from over_all the old data in all documents
 					DBObject term = terms.next();
 					if (term.get("search_term") != null){
 						objtoupd.put("search_term", term.get("search_term"));
@@ -473,52 +494,63 @@ public class Processor {
 				
 			}
 			}
+		// start looking for new search terms in text
 		log4j.info("going over the tweet text");
-		query = query.replaceAll("%40", "@");
-		query = query.replaceAll("%23", "#");
+		query = query.replaceAll("%40", "@"); // utf-8 code of @
+		query = query.replaceAll("%23", "#"); // utf-8 code of #
+		DBObject nodes = new BasicDBObject();
+		nodes.put("parent", query); 
+		nodes = colltree.findOne(nodes); // check if there is a document for parent in tree_nodes collection
+		if (nodes == null) // there is no document in tree_nodes
+		{
+			nodes = new BasicDBObject();
+			nodes.put("son", "no");
+			nodes.put("parent", query);
+		}
+		else // there is document in tree_nodes
+		{
+			nodes.put("in_process", 1); // mark as busy
+			this.colltree.save(nodes);
+			//nodes.put("son", nodes.get("son").toString() + "");
+		}
 		for (int i=0;i<textarray.length;i++){ // loop over the words of the tweet
 			if (textarray[i].trim().startsWith("@") || textarray[i].trim().startsWith("#")) { 
-				String thisterm = textarray[i].trim();
-				String[] no_ddot = thisterm.split("[:,., ,;,\n]");
-				//no_ddot = no_ddot[0].split(",");
-				//no_ddot = no_ddot[0].split(".");
+				String thisterm = textarray[i].trim(); // cut white spaces
+				String[] no_ddot = thisterm.split("[:,., ,;,\n]"); 
 				thisterm = no_ddot[0];
 				thisterm = thisterm.replaceAll("%40", "@");
 				thisterm = thisterm.replaceAll("%23", "#");
 				if (thisterm.length() > 1){
-					//if (isPureAscii(thisterm)){
 					log4j.info("search word: " +  thisterm);
 					objterm.put("search_term", thisterm); // object to find the search word in collection
 					log4j.info("inserting tree nodes to mongodb");
-					if (String.valueOf(query) != String.valueOf(thisterm)){
-						DBObject nodes = new BasicDBObject();
-						nodes.put("parent", query);
-						try
+					if (String.valueOf(query) != String.valueOf(thisterm)){ // query and search term not equal
+						if (nodes.get("son").toString() == "no") // no document in collection yet
 						{
-							nodes = colltree.findOne(nodes);
-							nodes.put("son", nodes.get("son").toString() + "," + thisterm);
-						}
-						catch (NullPointerException e)
-						{
-							nodes = new BasicDBObject();
-							nodes.put("parent", query);
+							
 							nodes.put("son", thisterm);
 						}
+						else // there is document in collection
+						{
+							nodes.put("son" , nodes.get("son").toString() + "," + thisterm);
+						}
 						//nodes.put("son", thisterm);
-						this.colltree.save(nodes);
+						
 						//neo4j.addNode(query, thisterm, log4j);
 					}
+					
 					//objtoupd = collsearch.findOne(objterm); // find the search word in collection
 					try{
-						DBObject term = this.collsearch.findOne(objterm);
+						DBObject term = this.collsearch.findOne(objterm); // get document os search_term if exists
+						// update current slot and over_all for existing document
 						term.put("over_all", Integer.parseInt(term.get("over_all").toString()) + 1);
 						term.put("slot" + current_slot_index, Integer.parseInt(term.get("slot" + this.current_slot_index).toString()) + 1);
 						//term.put("current_slot_start_time_millis", current_slot_start_time);
 						log4j.info("updating counter in current slot for word: " + thisterm);
 						this.collsearch.update(objterm, term);
 					}
-					catch (NullPointerException e){
-						//e.printStackTrace();
+					catch (NullPointerException e){ // there is no document for search term in collection
+						// creating a new document
 						log4j.info(thisterm + " is not yet in collection , inserting it");
 						DBObject newline = new BasicDBObject();
 						newline.put("search_term", thisterm);
@@ -526,63 +558,57 @@ public class Processor {
 						newline.put("max_id", 0);
 						newline.put("current_slot", current_slot_index);
 						newline.put("current_slot_start_time_millis", current_slot_start_time);
+						// creating all slots for document
 						for (int j=0;j<num_of_slots;j++){
 							if (j == current_slot_index){
-								newline.put("slot" + current_slot_index, 1);
+								newline.put("slot" + current_slot_index, 1); // current slot = 1
 							}
 							else{
-								newline.put("slot" + j, 0);
+								newline.put("slot" + j, 0); // non current slot = 0
 							}
 						}
 						
-						//newline.put("percentage", 100);
 						this.collsearch.insert(newline);
 						
 					}
-					//}
 				}
+				nodes.put("in_process", 0); // update tree_nodes document as not busy
+				this.colltree.save(nodes);
 				}
 			}
-		starttime = System.currentTimeMillis() - starttime; 
-		log4j.info("end update_search_terms, function took " + starttime + " millis");
+		log4j.info("end update_search_terms");
 		
 	}
 	
 	//----This function getting user id and inserts/updates counter with time slots handling----
 	//----------------------------------------------------------------------------------------
 	public void rate_user(long user_id , String user_name , double max_time_frame_hours) throws MongoException{
-		//log4j.info("starting function rate");
-		//BasicDBObject objind = new BasicDBObject();
 		BasicDBObject objterm = new BasicDBObject();
 		DBObject objtoupd = new BasicDBObject();
 		DBObject update = new BasicDBObject();
 		log4j.info("starting function rate user for : user_name = " + user_name + ", user_id = " + user_id +
 				", max_time_frame_hours = " + max_time_frame_hours);
-		//objind.put("user_id", 1); // an object to ensure a unique index of search term
-		//log4j.info("ensuring unique index user_id in user_rate collection");
-		//this.collrate.ensureIndex(objind, "user_id", true); // ensure a unique index of search term
 		try{
 			objterm.put("user_id", user_id);
-			DBObject term = this.collrate.findOne(objterm);
-			int previous_slot = (Integer) term.get("current_slot");
+			DBObject term = this.collrate.findOne(objterm); // get user's document if exists
+			int previous_slot = (Integer) term.get("current_slot"); // get last slot updated in user's document
 			double delta = (System.currentTimeMillis() - (Long) term.get("current_slot_start_time_millis")) / this.slot_time_millis ;
-			if (delta < 1){
-				//term.put("over_all", Integer.parseInt(term.get("over_all").toString()) + 1);
+			if (delta < 1){ // user was last updated in current slot
+				// updating counter for current slot
 				term.put("slot" + current_slot_index, Integer.parseInt(term.get("slot" + this.current_slot_index).toString()) + 1);
 				log4j.info("updating counter in current slot for userid: " + user_id + " user_name : " + user_name);
 				this.collrate.update(objterm, term);
 			}
-			else if(delta < this.num_of_slots){
+			else if(delta < this.num_of_slots){ 
+				// updating current slot to 1 and go as much as needed backwards and updating to zero
 				for (long h = 0;h<delta;h++){
 					long slot = (long) ((long) (this.current_slot_index + num_of_slots - h)% num_of_slots);
 					
 					if (h == 0){
-						term.put("slot" + slot, 1);
-						//term.put("over_all", Integer.parseInt(term.get("over_all").toString())  + 1 - Integer.parseInt(term.get("slot" + slot).toString()));
+						term.put("slot" + slot, 1); // current slot
 					}
 					else{
-						//term.put("over_all", Integer.parseInt(term.get("over_all").toString()) - Integer.parseInt(term.get("slot" + slot).toString()));
-						term.put("slot" + slot, 0);
+						term.put("slot" + slot, 0); // other slots since last updated
 					}
 					
 				}
@@ -591,9 +617,8 @@ public class Processor {
 				log4j.info("updating all slots needed: " + user_id + " user_name : " + user_name);
 				this.collrate.update(objterm, term);
 			}
-			else{
-				//term.put("over_all", 1);
-				//newline.put("max_id", 0);
+			else{ // time frame has finished since last updated
+				// updating all slots to zero except current slot to 1
 				term.put("current_slot", current_slot_index);
 				term.put("current_slot_start_time_millis", current_slot_start_time);
 				for (int j=0;j<num_of_slots;j++){
@@ -608,14 +633,12 @@ public class Processor {
 			
 			
 		}
-		catch (NullPointerException e){
-			//e.printStackTrace();
+		catch (NullPointerException e){ // no document in collection for this user
+			// creating document for user
 			log4j.info(user_name + " is not yet in collection , inserting it");
 			DBObject newline = new BasicDBObject();
 			newline.put("user_id", user_id);
 			newline.put("user_name", user_name);
-			//newline.put("over_all", 1);
-			//newline.put("max_id", 0);
 			newline.put("current_slot", current_slot_index);
 			newline.put("current_slot_start_time_millis", current_slot_start_time);
 			for (int j=0;j<num_of_slots;j++){
@@ -627,7 +650,6 @@ public class Processor {
 				}
 			}
 			
-			//newline.put("percentage", 100);
 			this.collrate.insert(newline);
 			
 		}
@@ -636,31 +658,7 @@ public class Processor {
 		
 	}
 	
-	//----This function getting tweet id and inserts/updates counter ----
-	public void UpdateTweetCounterId(long tweet_id)
-	{
-		log4j.info("starting function for tweet id : " + tweet_id);
-		BasicDBObject objind = new BasicDBObject();
-		try
-     	{
-     		BasicDBObject query5 = new BasicDBObject();
-     		query5.put("tweet_id",tweet_id);
-     		DBObject obj = this.collta.findOne(query5);
-     		obj.put("counter",Long.parseLong(obj.get("counter").toString())+1);
-     	}
-     	catch (NullPointerException e)
-     	{
-     		BasicDBObject doc = new BasicDBObject();
-     		doc.put("tweet_id",tweet_id);//the same as Id
-     		doc.put("counter", 1L);
-     		this.collta.insert(doc);
-     		//Long lObj1 = new Long(1);
-     		log4j.info("end function for tweet id : " + tweet_id);
-     	}
-
-	log4j.info("end function for tweet id : " + tweet_id);
-		
-}
+	
 	//-------------------------------------------------------------------------------------------------------
 	
 	
@@ -679,33 +677,7 @@ public class Processor {
 	
 	
 	
-	/*public static String right_place(Long NumTimeSlots,Long Timeslot,Long useid,DBCollection coll,String start,Long diff)
-	 {
-		 String s=useid.toString();
-		 BasicDBObject query5 = new BasicDBObject();
-		 query5.put("user_id",s);
-		 DBCursor cursor6 = coll.find(query5);
-		
-		 while (cursor6.hasNext()&&cursor6.next()!=null)
-		{
-			//System.out.println(cursor6.curr());
-		}
-		 if( cursor6.curr()!=null )
-		 {
-			 String  ststart=cursor6.curr().get("palceflag").toString();
-			 Long diffday=(diff/Timeslot)%NumTimeSlots;
-			 diffday=(long) Math.floor(diffday);
-			 
-			 Long newday=new Long(ststart);
-			 newday=(newday+diffday)%NumTimeSlots;
-			 newday=(long) Math.floor(newday);
-
-			 return newday.toString();
-		 }
-			
-		 return "Error";
-	 }
-	*/
+	
 	
 	//----This function getting search term and tweet id ----
 	//----the function adding the tweet id and the time of search to the collection search_results--
@@ -715,31 +687,51 @@ public class Processor {
 			try{
 				DBObject searchobj = new BasicDBObject();
 				searchobj.put("searchword", searchword);
-				DBObject obj = this.collsr.findOne(searchobj);
-				long min_time = System.currentTimeMillis() - this.frame_time;
-				String[] tweets = obj.get("tweets").toString().split(",");
-				String new_string = "";
-				for (int i=1;i<tweets.length;i+=2)
+				DBObject obj = this.collsr.findOne(searchobj); // get document if exists
+				long min_time = System.currentTimeMillis() - this.frame_time; // minimum time to keep in document
+				
+				if (Long.parseLong(obj.get("last_update").toString()) < min_time)
 				{
-					if (Long.parseLong(tweets[i]) >= min_time)
+					// last updated before minimum time - checking each tweet
+					String[] tweets = obj.get("tweets").toString().split(",");
+					String new_string = "";
+					for (int i=1;i<tweets.length;i+=2) // going over all existing tweets in document
 					{
-						if (new_string == "")
+						if (Long.parseLong(tweets[i]) >= min_time)
 						{
-							new_string += tweets[i-1] + "," + tweets[i];
-						}
-						else
-						{
-							new_string += "," + tweets[i-1] + "," + tweets[i];
+							// tweet stays in document
+							if (new_string == "")
+							{
+								// no leading comma
+								new_string += tweets[i-1] + "," + tweets[i];
+							}
+							else
+							{
+								// leading comma
+								new_string += "," + tweets[i-1] + "," + tweets[i];
+							}
 						}
 					}
+					obj.put("tweets", new_string + "," + tweet_id);
+					obj.put("last_update", System.currentTimeMillis());
+					//obj.put("in_process", 0);
+					this.collsr.save(obj);
 				}
-				obj.put("tweets", new_string + "," + tweet_id);
-				this.collsr.save(obj);
+				else
+				{
+					// last updated after minimum time - just adding tweet
+					obj.put("tweets", obj.get("tweets").toString() + "," + tweet_id);
+					this.collsr.save(obj);
+				}
+				
+				
 			}
 			catch (NullPointerException e){
+				// there is no document yet, creating one
 				DBObject searchobj = new BasicDBObject();
 				searchobj.put("searchword", searchword);
 				searchobj.put("tweets", tweet_id);
+				searchobj.put("last_update", System.currentTimeMillis());
 				this.collsr.save(searchobj);
 			}
 			log4j.info("ending function SearchResultId");
@@ -762,12 +754,7 @@ public class Processor {
 			
 				
 				String str=cursor6.get("text").toString();
-				//log4j.info("The text of the tweet was found:"+str);
-				//System.out.println(str);
 				return str;
-			
-			//log4j.warn("Error! The text of the tweet was'n found");
-			//return null;//should'nt be
 		}
 		
 		//--------------------------------------------------------------------------------------------------
@@ -890,7 +877,7 @@ public class Processor {
 		{
 			
 			log4j.info("==================================================");
-			log4j.info("We useing the comparing function number-"+FunctionNum);
+			log4j.info("using the comparing function number-"+FunctionNum);
 			vc = get_final_tweet_ids(vc);
 			System.out.println("size of list: " + vc.size());
 			duplicateTweets[] a=compOneF(vc,threshold,FunctionNum);	
@@ -929,17 +916,18 @@ public class Processor {
 		
 		public long GetRateTimeFrame(Long UserId,Long numofhours)
 		{
-			 this.log4j.info("======================================================");
-			 long diff = numofhours*60*60*1000;
+			 this.log4j.info("=================================================================");
+			 this.log4j.info("getting rate for user id: " + UserId + " within the last " + numofhours + " hours");
+			 long diff = numofhours*60*60*1000; // hours to millis
 			 BasicDBObject docline = new BasicDBObject();
 			 docline.put("user_id", UserId);//querying to find the right userId
 			 DBObject doc = this.collrate.findOne(docline);
-			 if (doc == null)
+			 if (doc == null) // there is no document for the user
 			 {
 				 this.log4j.error("user id : " + UserId + " does not exist");
 				 return -1L;
 			 }
-			 else
+			 else // document exists
 			 {
 			 long result = 0;
 			 long currstart = Long.parseLong(doc.get("current_slot_start_time_millis").toString());

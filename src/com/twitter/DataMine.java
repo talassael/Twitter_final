@@ -112,19 +112,8 @@ public class DataMine
 			final DB db = mongo.getDB("twitter");//Creating the name of the new DB
 			
 			final Processor proc = new Processor(mongo , db , slot_time_millis , frame_time , threshhold , depth , (long)num_of_slots);
-			/*LinkedList <String> search_terms = new LinkedList <String>();
-			search_terms.add("england");
-			search_terms.add("israel");
-			search_terms.add("aaaaaaaaaaaaaaaaaaa123");
-
-			LinkedList <Long> result = proc.get_tweets(search_terms);
-			int counter = 0;
-			Iterator<Long> a = result.iterator();
-			while (a.hasNext()){
-				counter++;
-				System.out.println(String.valueOf(a.next()));
-			}
-			System.out.println(counter);*/
+			
+			
 			Thread t1=new Thread(new Runnable(){
 				public void run(){
 					try {
@@ -140,8 +129,6 @@ public class DataMine
 					proc.update_tree();
 				}
 			});
-			//t0.setPriority(10);
-			//t0.start();
 			t1.setPriority(Thread.MAX_PRIORITY);
 			
 			

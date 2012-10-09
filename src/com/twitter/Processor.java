@@ -100,7 +100,9 @@ public class Processor {
 	volatile BasicDBObject index_sr;
 	volatile BasicDBObject index_tree;
 	static volatile int[][] multD =null;
-	Logger log4j = Logger.getLogger("twitterjava.log");
+	Logger log4j = Logger.getLogger("twitterProject.log"); // logging for the main data processing methods
+	Logger log4jdupl = Logger.getLogger("twitterduplicates.log"); // logging for the find duplicates methods
+	Logger log4jur = Logger.getLogger("twitteruserrate.log"); // logging for the get user rate method
 	//static CharsetEncoder asciiEncoder = Charset.forName("US-ASCII").newEncoder(); // or "ISO-8859-1" for ISO Latin 1
 	public int current_slot_index;// index of current time slot
     public long current_slot_start_time;// starting time of current time slot
@@ -143,23 +145,20 @@ public class Processor {
 		this.index_sr = new BasicDBObject("searchword" , 1);
 		this.index_tree = new BasicDBObject("parent",1);
 		//this.index_tree.put("son", 1);
-		log4j.info("ensuring uniqe index for tweet id in all_tweets collection");
+		//log4j.info("ensuring uniqe index for tweet id in all_tweets collection");
 		this.collat.ensureIndex(this.index_all_tweets , "tweet_id" , true);
-		log4j.info("ensuring uniqe index for user id in user_rate collection");
+		//log4j.info("ensuring uniqe index for user id in user_rate collection");
 		this.collrate.ensureIndex(this.index_user_rate, "user_id", true);
-		log4j.info("ensuring uniqe index for search term in search terms collection");
+		//log4j.info("ensuring uniqe index for search term in search terms collection");
 		this.collsearch.ensureIndex(this.index_search_terms, "search_term", true);
-		log4j.info("ensuring non uniqe index for over_all in search terms collection");
+		//log4j.info("ensuring non uniqe index for over_all in search terms collection");
 		this.collsearch.ensureIndex(this.index_over_all, "over_all", false);
-		log4j.info("ensuring non uniqe index for id in tweet_appearence collection");
+		//log4j.info("ensuring non uniqe index for id in tweet_appearence collection");
 		//this.collta.ensureIndex(this.index_tweet_appearence, "tweet_id", true);
-		log4j.info("ensuring uniqe index for searchword in search_results collection");
+		//log4j.info("ensuring uniqe index for searchword in search_results collection");
 		this.collsr.ensureIndex(this.index_sr , "searchword" , true);
-		//this.tweet_id_index = 0;
-		log4j.info("ensuring uniqe index for parent and son in tree nodes collection");
+		//log4j.info("ensuring uniqe index for parent and son in tree nodes collection");
 		colltree.ensureIndex(this.index_tree , "parentson" , true);
-		
-		//this.myNeoInstance.createDb();
 		
 		
 	}
@@ -169,7 +168,7 @@ public class Processor {
 	//----------------------------------------------------------------------------------------
 	public LinkedList <String> get_tweets(LinkedList <String> search_terms)
 	{
-		log4j.info("starting function get_tweets");
+		log4jdupl.info("starting function get_tweets");
 		LinkedList<String> result = new LinkedList <String>();
 		Iterator<String> terms = search_terms.iterator();
 		long curr_time = System.currentTimeMillis();
@@ -203,18 +202,18 @@ public class Processor {
 					}
 				}
 				count_all += count; 
-				log4j.info(count + " tweets for term: " + term);
+				log4jdupl.info(count + " tweets for term: " + term);
 				obj.put("tweets", new_string); // replace 'tweets' field
 				obj.put("last_update", System.currentTimeMillis()); // update time of update
 				collsr.save(obj);
 			}
 			catch (NullPointerException e){
-				log4j.info("search_term: " + term + ", is not in collection search_results");
+				log4jdupl.info("search_term: " + term + ", is not in collection search_results");
 			}
 			
 		}
-		log4j.info("over_all there are " + count_all + " tweets to compare!!!");
-		log4j.info("ending function get_tweets");
+		log4jdupl.info("over_all there are " + count_all + " tweets to compare!!!");
+		log4jdupl.info("ending function get_tweets");
 		return result;
 	}
 	
@@ -222,7 +221,7 @@ public class Processor {
 	//---------the function returns a list of tweet_ids-----------
 	//----------------------------------------------------------------------------------------
 	public LinkedList<String> get_final_tweet_ids(LinkedList <String> a){
-		a = neo4j.getallsearchterms(a, depth, log4j); // traverse tree and get terms
+		a = neo4j.getallsearchterms(a, depth, log4jdupl); // traverse tree and get terms
 		LinkedList<String> b = this.get_tweets(a); // get tweet ids
 		return b;
 	}
@@ -772,7 +771,7 @@ public class Processor {
 		//---------elements into ascending order,and returning the sorted LinkedList--------
 		public LinkedList<String> sortTweetId(LinkedList<String> vc)
 		{
-			log4j.info("=========================================================");		  
+			log4jdupl.info("=========================================================");		  
 		    Collections.sort(vc);	  
 			return vc;
 		}
@@ -876,27 +875,27 @@ public class Processor {
 		public void TweetCompare(LinkedList<String> vc,int FunctionNum,int threshold)
 		{
 			
-			log4j.info("==================================================");
-			log4j.info("using the comparing function number-"+FunctionNum);
+			log4jdupl.info("==================================================");
+			log4jdupl.info("using the comparing function number-"+FunctionNum);
 			vc = get_final_tweet_ids(vc);
 			System.out.println("size of list: " + vc.size());
 			duplicateTweets[] a=compOneF(vc,threshold,FunctionNum);	
 			if (a.length > 0)
 			{
-				log4j.info("The result of this function is:");
+				log4jdupl.info("The result of this function is:");
 			}
 			else
 			{
-				log4j.info("there are no tweets to compare!!!");
+				log4jdupl.info("there are no tweets to compare!!!");
 				return;
 			}
 			for(int i=0;i<(a.length);i++)
 			{
 				if(a[i]!=null)
 				{
-					log4j.info("==================================================");
-					log4j.info("Tweet ID: "+a[i].getTweet_id());
-					log4j.info("Isunique is: "+a[i].isIsunique());
+					log4jdupl.info("==================================================");
+					log4jdupl.info("Tweet ID: "+a[i].getTweet_id());
+					log4jdupl.info("Isunique is: "+a[i].isIsunique());
 				}
 				
 				for(int j=0;j<=(a.length-1);j++)
@@ -905,12 +904,12 @@ public class Processor {
 					{
 						if(a[i].str[j]!=null)
 						/*{
-							log4j.info("In index "+j+" str is:null");
+							log4jdupl.info("In index "+j+" str is:null");
 						}
 						else*/
 						{
-							log4j.info("matching Tweet ID: "+a[i].str[j].strTweet_id);
-							log4j.info("grade between id's: " + a[i].getTweet_id() + " and " + a[i].str[j].strTweet_id + " is:    " +a[i].str[j].grade);
+							log4jdupl.info("matching Tweet ID: "+a[i].str[j].strTweet_id);
+							log4jdupl.info("grade between id's: " + a[i].getTweet_id() + " and " + a[i].str[j].strTweet_id + " is:    " +a[i].str[j].grade);
 						}
 					}
 
@@ -924,15 +923,15 @@ public class Processor {
 		
 		public long GetRateTimeFrame(Long UserId,Long numofhours)
 		{
-			 this.log4j.info("=================================================================");
-			 this.log4j.info("getting rate for user id: " + UserId + " within the last " + numofhours + " hours");
+			 this.log4jur.info("=================================================================");
+			 this.log4jur.info("getting rate for user id: " + UserId + " within the last " + numofhours + " hours");
 			 long diff = numofhours*60*60*1000; // hours to millis
 			 BasicDBObject docline = new BasicDBObject();
 			 docline.put("user_id", UserId);//querying to find the right userId
 			 DBObject doc = this.collrate.findOne(docline);
 			 if (doc == null) // there is no document for the user
 			 {
-				 this.log4j.error("user id : " + UserId + " does not exist");
+				 this.log4jur.error("user id : " + UserId + " does not exist");
 				 return -1L;
 			 }
 			 else // document exists
@@ -941,7 +940,7 @@ public class Processor {
 			 long currstart = Long.parseLong(doc.get("current_slot_start_time_millis").toString());
 			 if (System.currentTimeMillis() - diff > currstart)
 			 {
-				 this.log4j.info("result is 0");
+				 this.log4jur.info("result is 0");
 				 return 0;
 			 }
 			 else
@@ -949,14 +948,14 @@ public class Processor {
 				 double backslots = diff/this.slot_time_millis;
 				 if (backslots > this.num_of_slots)
 				 {
-					 this.log4j.info("you requested longer time than the time frame, the result will be only for the previous timeframe");
+					 this.log4jur.info("you requested longer time than the time frame, the result will be only for the previous timeframe");
 				 }
 				 for (int i=0;i<backslots || i<this.num_of_slots;i++)
 				 {
 					 int slot = (int) ((this.current_slot_index - i + this.num_of_slots)%this.num_of_slots);
 					 result += Long.parseLong(doc.get("slot" + slot).toString());
 				 }
-				 this.log4j.info("result is " + result);
+				 this.log4jur.info("result is " + result);
 				 return result;
 			 }
 			 }

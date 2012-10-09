@@ -85,7 +85,8 @@ public class DataMine
 			final String frame, slots;
 			final double  num_of_slots;
 			final double max_time_frame_hours;
-			int threshhold;
+			final String[] rateparam , comparam;
+			final int threshhold, mode;
 			//	how to retrive data from configuration file (.properties file) 
 			Properties prop = new Properties();
 			try {
@@ -96,56 +97,59 @@ public class DataMine
 			}
 			slots = prop.getProperty("slots");
 			frame = prop.getProperty("frame");
+			rateparam = prop.getProperty("rateparam").split(",");
+			comparam = prop.getProperty("comparam").split(",");
+			mode = Integer.parseInt(prop.getProperty("mode"));
 			threshhold = Integer.parseInt(prop.getProperty("threshhold").toString());
 			int depth = Integer.parseInt(prop.getProperty("depth").toString());
 			max_time_frame_hours = Long.parseLong(frame);
 			num_of_slots = Double.parseDouble(slots);
 			long frame_time = (long)(max_time_frame_hours * 60*60*1000);
 			
-			System.out.println("num_of_slots = " + num_of_slots);
-			System.out.println("frame = " + frame);
 			double slot_time_millis = (max_time_frame_hours/num_of_slots)*60*60*1000;
 				
 				
-			System.out.println("slot_time_millis = " + (long)slot_time_millis);
 			Mongo mongo=new Mongo("localhost",27017);
 			final DB db = mongo.getDB("twitter");//Creating the name of the new DB
 			
 			final Processor proc = new Processor(mongo , db , slot_time_millis , frame_time , threshhold , depth , (long)num_of_slots);
 			
-			
-			Thread t1=new Thread(new Runnable(){
-				public void run(){
-					try {
-						proc.update_all_tweets(num_of_slots , max_time_frame_hours);
-					} catch (ParseException e) {
-						e.printStackTrace();
+			if (mode == 10)
+			{
+				Thread t1=new Thread(new Runnable(){
+					public void run(){
+						try {
+							proc.update_all_tweets(num_of_slots , max_time_frame_hours);
+						} catch (ParseException e) {
+							e.printStackTrace();
+						}
 					}
-				}
-			});
+				});
+				
+				Thread t2=new Thread(new Runnable(){
+					public void run(){
+						proc.update_tree();
+					}
+				});
+				t1.setPriority(Thread.MAX_PRIORITY);
+				
+				
+				t2.start();
+				t1.start();
+			}
+			else if (mode == 20)
+			{
+				proc.GetRateTimeFrame(Long.parseLong(rateparam[0]), Long.parseLong(rateparam[1]));
+			}
 			
-			Thread t2=new Thread(new Runnable(){
-				public void run(){
-					proc.update_tree();
-				}
-			});
-			t1.setPriority(Thread.MAX_PRIORITY);
+			else
+			{
+				LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList(comparam));
+				proc.TweetCompare(searchlist, mode, threshhold);
+			}
 			
-			
-			t2.start();
-			t1.start();
 			//String[] a = {"#global"};
 			//neo4j.addNode("@nathanhowell", a , proc.log4j);
-			
-			//proc.GetRateTimeFrame(602720179L, 97L);
-			
-			
-			
-			/*LinkedList <String> searchlist = new LinkedList <String>(Arrays.asList("#kenya","#usa","tttal"));
-			proc.TweetCompare(searchlist, 1, proc.threshold);*/
-			
-			
-			
 			//proc.TweetCompare(searchlist, 2, proc.threshold);
 
 		}//close main

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -111,6 +112,10 @@ public class Processor {
     public int depth;// depth to look in tree
     public long num_of_slots;//number of slots
     public double slot_time_millis;// time of a single time slot
+    public HashMap<String , Integer> copied_from;
+    public HashMap<String , Integer> copied_by;
+    public HashMap<String , String> copied_from_ids;
+    public HashMap<String , String> copied_by_ids;
     //static volatile long tweet_id_index;
     //static Long MaximumInsertSize=160L;
     //public neo4j myNeoInstance = new neo4j();
@@ -159,6 +164,10 @@ public class Processor {
 		this.collsr.ensureIndex(this.index_sr , "searchword" , true);
 		//log4j.info("ensuring uniqe index for parent and son in tree nodes collection");
 		colltree.ensureIndex(this.index_tree , "parentson" , true);
+		this.copied_by = new HashMap<String, Integer>();
+		this.copied_from = new HashMap<String, Integer>();
+		this.copied_by_ids = new HashMap<String, String>();
+		this.copied_from_ids = new HashMap<String, String>();
 		
 		
 	}
@@ -742,7 +751,7 @@ public class Processor {
 		//----This function searching the data Base and finds the tweet with the same tweet_id----
 		//---------the function was given,and returns the text of the tweet as a string-----------
 		//----------------------------------------------------------------------------------------
-		public String FromTweetIdToText(String TweetId)
+		public String[] FromTweetIdToText(String TweetId)
 		{
 			//log4j.info("==================================================");
 			//DBCollection coll=db.getCollection("all_tweets");
@@ -752,7 +761,9 @@ public class Processor {
 				
 			
 				
-				String str=cursor6.get("text").toString();
+				String[] str = new String[2];
+				str[0] = cursor6.get("text").toString();
+				str[1] = cursor6.get("from_user_id").toString();
 				return str;
 		}
 		
@@ -794,7 +805,7 @@ public class Processor {
 		//---------------------------------------------------------------------------------------------------------
 		public duplicateTweets[] compOneF(LinkedList<String> vc,int threshold,int FunctionNum)
 		{
-			String one,second;//will hold the strings of text from the tweets
+			String[] one,second;//will hold the strings of text from the tweets
 
 			LinkedList<String> v=sortTweetId(vc);//sorting the LinkedList by tweet_id so that the earliest tweet will show first 
 
@@ -818,6 +829,7 @@ public class Processor {
 										  //a new duplicateTweets
 					outarr[firstTweetId]=new duplicateTweets(v.size());
 					outarr[firstTweetId].setTweet_id(v.get(firstTweetId));
+					
 					//log4j.info("we createing in the place:"+firstTweetId+" ,a new duplicateTweets with Tweet_id:"+outarr[firstTweetId].getTweet_id());
 					//System.out.println(outarr[firstTweetId].getTweet_id());							
 				}
@@ -831,22 +843,23 @@ public class Processor {
 					//Here we getting the text of the tweets,using the function FromTweetIdToText
 					one=FromTweetIdToText(v.get(firstTweetId));
 					second=FromTweetIdToText(v.get(secondTweetId));
+					outarr[firstTweetId].set_from_user_id(Long.parseLong(one[1]));
 					
 					//making sure that the size of both tweet text is equal,and if not we cut them to an equal size					
-					int sizeOne=one.length();
-					int sizeSecond=second.length();
+					int sizeOne=one[0].length();
+					int sizeSecond=second[0].length();
 					int diff = Math.abs(sizeOne-sizeSecond);
 						
 					if(sizeOne <= sizeSecond)
 					{
-						one = Rpad(one , diff);
+						one[0] = Rpad(one[0] , diff);
 					}
 					else//one.length()>second.length()
 					{
-						second = Rpad(second , diff);
+						second[0] = Rpad(second[0] , diff);
 					}
 					//Here we use a Comparing class-TweetComparing
-					TweetComparing TC=new TweetComparing(one,second,FunctionNum);
+					TweetComparing TC=new TweetComparing(one[0],second[0],FunctionNum);
 					int FuctionRes=TC.ValidationRules(FunctionNum);//using the comparing function to calculate the distance 
 						
 					if(thresholdfunction(threshold,FuctionRes)&&( myarr[secondTweetId]==1))//checking if the tweets_id are 
@@ -859,6 +872,7 @@ public class Processor {
 						outarr[firstTweetId].str[secondTweetId]=new st();//creating the objects(=st) array str in(array) outarr--> st[] str;
 						outarr[firstTweetId].str[secondTweetId].strTweet_id=new String(v.get(secondTweetId));
 						outarr[firstTweetId].str[secondTweetId].grade=FuctionRes;
+						outarr[firstTweetId].str[secondTweetId].from_user_id = Long.parseLong(second[1]);
 						//log4j.info("============================================================================");
 						//log4j.info("The strTweet_id is:"+v.get(secondTweetId));
 						//System.out.println("The strTweet_id is:"+v.get(secondTweetId));
@@ -885,6 +899,7 @@ public class Processor {
 		public void TweetCompare(LinkedList<String> vc,int FunctionNum,int threshold)
 		{
 			String sFileName = "c:\\duplicates" + System.currentTimeMillis() + ".csv";
+			String usersdupfile = "c:\\userdup" + System.currentTimeMillis() + ".txt";
 			String tocsvfile = "";
 			
 			log4jdupl.info("==================================================");
@@ -928,6 +943,44 @@ public class Processor {
 							log4jdupl.info("matching Tweet ID: "+a[i].str[j].strTweet_id);
 							log4jdupl.info("grade between id's: " + a[i].getTweet_id() + " and " + a[i].str[j].strTweet_id + " is:    " +a[i].str[j].grade);
 							tocsvfile += a[i].str[j].strTweet_id + ",";
+							String par = a[i].getUser_id().toString();
+							String son = a[i].str[j].from_user_id.toString();
+							try
+							{
+								
+								this.copied_from.put(par, this.copied_from.get(par) + 1);        
+							}
+							catch (NullPointerException e)
+							{
+								this.copied_from.put(par , 1);
+							}
+							try
+							{
+								
+								this.copied_by.put(son, this.copied_by.get(son) + 1);        
+							}
+							catch (NullPointerException e)
+							{
+								this.copied_by.put(son , 1);
+							}
+							try
+							{
+								
+								this.copied_from_ids.put(par, this.copied_from_ids.get(par) + "," + a[i].getTweet_id());        
+							}
+							catch (NullPointerException e)
+							{
+								this.copied_from_ids.put(par , a[i].getTweet_id());
+							}
+							try
+							{
+								
+								this.copied_by_ids.put(son, this.copied_by_ids.get(son) + "," + a[i].str[j].strTweet_id);        
+							}
+							catch (NullPointerException e)
+							{
+								this.copied_by_ids.put(son , a[i].str[j].strTweet_id);
+							}
 						}
 					}
 
@@ -941,6 +994,27 @@ public class Processor {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+			String touserfile = "";
+			Iterator<String> iter = this.copied_from.keySet().iterator();
+			while (iter.hasNext())
+			{
+				String user = iter.next();
+				touserfile += "user_id: " + user + " was quoted " + this.copied_from.get(user) + " times, the quoted tweets are: " + this.copied_from_ids.get(user) + "\n";
+			}
+			iter = this.copied_by.keySet().iterator();
+			while (iter.hasNext())
+			{
+				String user = iter.next();
+				touserfile += "user_id: " + user + " quote others " + this.copied_by.get(user) + " times, the replica tweets are: " + this.copied_by_ids.get(user) + "\n";
+			}
+			try {
+				FileWriter writer = new FileWriter(usersdupfile);
+				writer.append(touserfile);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
 
 		}
 		//---------------------------------------------------------------------------------------------------------------

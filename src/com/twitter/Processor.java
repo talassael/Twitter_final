@@ -522,7 +522,7 @@ public class Processor {
 			//nodes.put("son", nodes.get("son").toString() + "");
 		}
 		for (int i=0;i<textarray.length;i++){ // loop over the words of the tweet
-			if (textarray[i].trim().startsWith("@") || textarray[i].trim().startsWith("#")) { 
+			if (/*textarray[i].trim().startsWith("@") || */textarray[i].trim().startsWith("#")) { 
 				String thisterm = textarray[i].trim(); // cut white spaces
 				String[] no_ddot = thisterm.split("[:,., ,;,\n]"); 
 				thisterm = no_ddot[0];

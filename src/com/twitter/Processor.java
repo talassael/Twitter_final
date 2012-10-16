@@ -778,6 +778,15 @@ public class Processor {
 		
 		//--------------------------------------------------------------------------------------------------------------
 		
+		public static String Rpad(String s , int n)
+		{
+			for (int i=0;i<n;i++)
+			{
+				s += " ";
+			}
+			return s;
+		}
+		
 		//---------------------------------------------------------------------------------------------------------
 		//----This function get the LinkedList of Tweet_id's-vc,the threshold number,and the number of the function----
 		//----we  want to compare the tweets with.for example if FunctionNum=1 ,we will use the Hamming Distance---
@@ -826,14 +835,15 @@ public class Processor {
 					//making sure that the size of both tweet text is equal,and if not we cut them to an equal size					
 					int sizeOne=one.length();
 					int sizeSecond=second.length();
+					int diff = Math.abs(sizeOne-sizeSecond);
 						
-					if(one.length()<=second.length())
+					if(sizeOne <= sizeSecond)
 					{
-						second=second.substring(0, sizeOne);
+						one = Rpad(one , diff);
 					}
 					else//one.length()>second.length()
 					{
-						one=one.substring(0, sizeSecond);
+						second = Rpad(second , diff);
 					}
 					//Here we use a Comparing class-TweetComparing
 					TweetComparing TC=new TweetComparing(one,second,FunctionNum);
@@ -874,6 +884,8 @@ public class Processor {
 		//-------------------------------------------------------------------------------------------
 		public void TweetCompare(LinkedList<String> vc,int FunctionNum,int threshold)
 		{
+			String sFileName = "c:\\duplicates" + System.currentTimeMillis() + ".csv";
+			String tocsvfile = "";
 			
 			log4jdupl.info("==================================================");
 			log4jdupl.info("using the comparing function number-"+FunctionNum);
@@ -896,6 +908,11 @@ public class Processor {
 					log4jdupl.info("==================================================");
 					log4jdupl.info("Tweet ID: "+a[i].getTweet_id());
 					log4jdupl.info("Isunique is: "+a[i].isIsunique());
+					tocsvfile += "\n" + a[i].getTweet_id() + ",";
+					if (a[i].isIsunique())
+					{
+						tocsvfile += "UNIQUE";
+					}
 				}
 				
 				for(int j=0;j<=(a.length-1);j++)
@@ -910,11 +927,19 @@ public class Processor {
 						{
 							log4jdupl.info("matching Tweet ID: "+a[i].str[j].strTweet_id);
 							log4jdupl.info("grade between id's: " + a[i].getTweet_id() + " and " + a[i].str[j].strTweet_id + " is:    " +a[i].str[j].grade);
+							tocsvfile += a[i].str[j].strTweet_id + ",";
 						}
 					}
 
 				}
 
+			}
+			try {
+				FileWriter writer = new FileWriter(sFileName);
+				writer.append(tocsvfile);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 
 		}

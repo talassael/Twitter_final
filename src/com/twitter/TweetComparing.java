@@ -24,8 +24,8 @@ package com.twitter;
 				{
 					case 1:
 					{
-						HammingDistance h=new HammingDistance(s1,s2);
-						return h.getDistance();
+						//HammingDistance h=new HammingDistance(s1,s2);
+						return HammingDistance.getDistance(s1,s2);
 					}
 					case 2:
 					{

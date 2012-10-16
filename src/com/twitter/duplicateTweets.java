@@ -7,7 +7,8 @@ package com.twitter;
 public class duplicateTweets 
 {
 	private String tweet_id;
-	private boolean Isunique;	
+	private boolean Isunique;
+	private long from_user_id;
 	
 	public st[] str; 	
 	
@@ -28,11 +29,20 @@ public class duplicateTweets
 		return tweet_id;
 	}
 	//------------------------------------------------
+	public void set_from_user_id(long user_id) {
+		this.from_user_id = user_id;
+	}
+	//------------------------------------------------
+	public Long getUser_id() {
+		return from_user_id;
+	}
+	//------------------------------------------------
 	
 	public duplicateTweets (int size)//duplicateTweets constructor
 	{
 		this.setTweet_id(null);
 		this.setIsunique(true);
+		this.set_from_user_id(0);
 		str=new st[size];
 	}
 }

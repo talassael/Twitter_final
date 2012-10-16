@@ -4,6 +4,7 @@ package com.twitter;
 public class st
 	{
 		String strTweet_id;//the tweet_id
+		Long from_user_id;
 		int grade;//the value of the comparing distance function
 		
 		public st()//st constructor

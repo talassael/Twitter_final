@@ -148,7 +148,7 @@ def searchtweets(query,since_id='',):
         j.clear()       # clear json
         u.close()
         logging.info('**********************************************************************************************************************')
-    print str(count_total) + ' results found for: ' + str(query)
+    #print str(count_total) + ' results found for: ' + str(query)
     #pprint.pprint(j)
     #a = searchtweets.searchtweets('israel')
     """

@@ -898,10 +898,10 @@ public class Processor {
 		//-------------------------------------------------------------------------------------------
 		public void TweetCompare(LinkedList<String> vc,int FunctionNum,int threshold)
 		{
-			String sFileName = "c:\\duplicates" + System.currentTimeMillis() + ".csv";
-			String usersdupfile = "c:\\userdup" + System.currentTimeMillis() + ".txt";
+			String sFileName = "duplicates" + System.currentTimeMillis() + ".csv";
+			String usersdupfile = "userdup" + System.currentTimeMillis() + ".csv";
 			String tocsvfile = "";
-			
+			int count = 0;
 			log4jdupl.info("==================================================");
 			log4jdupl.info("using the comparing function number-"+FunctionNum);
 			vc = get_final_tweet_ids(vc);
@@ -918,6 +918,7 @@ public class Processor {
 			}
 			for(int i=0;i<(a.length);i++)
 			{
+				count = 0;
 				if(a[i]!=null)
 				{
 					log4jdupl.info("==================================================");
@@ -929,67 +930,76 @@ public class Processor {
 						tocsvfile += "UNIQUE";
 					}
 				}
-				
-				for(int j=0;j<=(a.length-1);j++)
+				if (a[i]!=null && !a[i].isIsunique())
 				{
-					if((a[i]!=null))
+					for(int j=0;j<=(a.length-1);j++)
 					{
-						if(a[i].str[j]!=null)
-						/*{
-							log4jdupl.info("In index "+j+" str is:null");
-						}
-						else*/
+						if((a[i]!=null))
 						{
-							log4jdupl.info("matching Tweet ID: "+a[i].str[j].strTweet_id);
-							log4jdupl.info("grade between id's: " + a[i].getTweet_id() + " and " + a[i].str[j].strTweet_id + " is:    " +a[i].str[j].grade);
-							tocsvfile += a[i].str[j].strTweet_id + ",";
-							String par = a[i].getUser_id().toString();
-							String son = a[i].str[j].from_user_id.toString();
-							try
+							if(a[i].str[j]!=null)
+							/*{
+								log4jdupl.info("In index "+j+" str is:null");
+							}
+							else*/
 							{
+								log4jdupl.info("matching Tweet ID: "+a[i].str[j].strTweet_id);
+								log4jdupl.info("grade between id's: " + a[i].getTweet_id() + " and " + a[i].str[j].strTweet_id + " is:    " +a[i].str[j].grade);
+								tocsvfile += a[i].str[j].strTweet_id + ",";
+								String par = a[i].getUser_id().toString();
+								String son = a[i].str[j].from_user_id.toString();
+								if (count == 0)
+								{
+									try
+									{
+										
+										this.copied_from.put(par, this.copied_from.get(par) + 1);        
+									}
+									catch (NullPointerException e)
+									{
+										this.copied_from.put(par , 1);
+									}
+									try
+									{
+										
+										this.copied_from_ids.put(par, this.copied_from_ids.get(par) + "," + a[i].getTweet_id());        
+									}
+									catch (NullPointerException e)
+									{
+										this.copied_from_ids.put(par , a[i].getTweet_id());
+									}
+								}
+								count++;
+								try
+								{
+									
+									this.copied_by.put(son, this.copied_by.get(son) + 1);        
+								}
+								catch (NullPointerException e)
+								{
+									this.copied_by.put(son , 1);
+								}
 								
-								this.copied_from.put(par, this.copied_from.get(par) + 1);        
-							}
-							catch (NullPointerException e)
-							{
-								this.copied_from.put(par , 1);
-							}
-							try
-							{
-								
-								this.copied_by.put(son, this.copied_by.get(son) + 1);        
-							}
-							catch (NullPointerException e)
-							{
-								this.copied_by.put(son , 1);
-							}
-							try
-							{
-								
-								this.copied_from_ids.put(par, this.copied_from_ids.get(par) + "," + a[i].getTweet_id());        
-							}
-							catch (NullPointerException e)
-							{
-								this.copied_from_ids.put(par , a[i].getTweet_id());
-							}
-							try
-							{
-								
-								this.copied_by_ids.put(son, this.copied_by_ids.get(son) + "," + a[i].str[j].strTweet_id);        
-							}
-							catch (NullPointerException e)
-							{
-								this.copied_by_ids.put(son , a[i].str[j].strTweet_id);
+								try
+								{
+									
+									this.copied_by_ids.put(son, this.copied_by_ids.get(son) + "," + a[i].str[j].strTweet_id);        
+								}
+								catch (NullPointerException e)
+								{
+									this.copied_by_ids.put(son , a[i].str[j].strTweet_id);
+								}
 							}
 						}
+	
 					}
-
 				}
 
 			}
 			try {
 				FileWriter writer = new FileWriter(sFileName);
 				writer.append(tocsvfile);
+				writer.flush();
+				writer.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -999,17 +1009,19 @@ public class Processor {
 			while (iter.hasNext())
 			{
 				String user = iter.next();
-				touserfile += "user_id: " + user + " was quoted " + this.copied_from.get(user) + " times, the quoted tweets are: " + this.copied_from_ids.get(user) + "\n";
+				touserfile += user + ",header," + this.copied_from.get(user) + "," + this.copied_from_ids.get(user) + "\n";
 			}
 			iter = this.copied_by.keySet().iterator();
 			while (iter.hasNext())
 			{
 				String user = iter.next();
-				touserfile += "user_id: " + user + " quote others " + this.copied_by.get(user) + " times, the replica tweets are: " + this.copied_by_ids.get(user) + "\n";
+				touserfile += user + ",tail," + this.copied_by.get(user) + "," + this.copied_by_ids.get(user) + "\n";
 			}
 			try {
 				FileWriter writer = new FileWriter(usersdupfile);
 				writer.append(touserfile);
+				writer.flush();
+				writer.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

@@ -23,6 +23,7 @@ def search():
     connection = pymongo.Connection("localhost", 27017) # connect to mongodb
     logging.info(str(time.ctime()) + ' : connecting to the "twitter" DB') #log
     db = connection.twitter # connect to "twitter" db
+    db.search_terms.ensure_index("search_term", unique=True)
     logging.info(str(time.ctime()) + ' : creating a queue for search terms') #log
     queue = Queue.Queue(max_queue)  #create a queue for search terms
     logging.info(str(time.ctime()) + ' : starts searching endless loop') #log
